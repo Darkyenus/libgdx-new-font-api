@@ -91,9 +91,9 @@ POST_UNINSTALL = :
 build_triplet = x86_64-apple-darwin15.6.0
 host_triplet = x86_64-apple-darwin15.6.0
 bin_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3)
-am__append_1 = hb-view
-am__append_2 = hb-shape hb-subset
-am__append_3 = hb-ot-shape-closure
+##am__append_1 = hb-view
+#am__append_2 = hb-shape hb-subset
+#am__append_3 = hb-ot-shape-closure
 subdir = util
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_link_flag.m4 \
@@ -110,10 +110,10 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-am__EXEEXT_1 = hb-view$(EXEEXT)
-am__EXEEXT_2 = hb-shape$(EXEEXT) hb-subset$(EXEEXT)
-am__EXEEXT_3 =  \
-	hb-ot-shape-closure$(EXEEXT)
+##am__EXEEXT_1 = hb-view$(EXEEXT)
+#am__EXEEXT_2 = hb-shape$(EXEEXT) hb-subset$(EXEEXT)
+#am__EXEEXT_3 =  \
+#	hb-ot-shape-closure$(EXEEXT)
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am__hb_ot_shape_closure_SOURCES_DIST = hb-ot-shape-closure.cc \
@@ -121,8 +121,8 @@ am__hb_ot_shape_closure_SOURCES_DIST = hb-ot-shape-closure.cc \
 am__objects_1 =
 am__objects_2 = hb-ot-shape-closure.$(OBJEXT) options.$(OBJEXT) \
 	$(am__objects_1)
-am_hb_ot_shape_closure_OBJECTS =  \
-	$(am__objects_2)
+#am_hb_ot_shape_closure_OBJECTS =  \
+#	$(am__objects_2)
 hb_ot_shape_closure_OBJECTS = $(am_hb_ot_shape_closure_OBJECTS)
 hb_ot_shape_closure_LDADD = $(LDADD)
 am__DEPENDENCIES_1 =
@@ -136,7 +136,7 @@ am__v_lt_1 =
 am__hb_shape_SOURCES_DIST = hb-shape.cc options.cc options.hh \
 	main-font-text.hh shape-consumer.hh
 am__objects_3 = hb-shape.$(OBJEXT) options.$(OBJEXT) $(am__objects_1)
-am_hb_shape_OBJECTS = $(am__objects_3)
+#am_hb_shape_OBJECTS = $(am__objects_3)
 hb_shape_OBJECTS = $(am_hb_shape_OBJECTS)
 hb_shape_LDADD = $(LDADD)
 hb_shape_DEPENDENCIES = $(top_builddir)/src/libharfbuzz.la \
@@ -145,13 +145,13 @@ hb_shape_DEPENDENCIES = $(top_builddir)/src/libharfbuzz.la \
 am__hb_subset_SOURCES_DIST = hb-subset.cc options.cc options.hh \
 	main-font-text.hh
 am__objects_4 = hb-subset.$(OBJEXT) options.$(OBJEXT) $(am__objects_1)
-am_hb_subset_OBJECTS = $(am__objects_4)
+#am_hb_subset_OBJECTS = $(am__objects_4)
 hb_subset_OBJECTS = $(am_hb_subset_OBJECTS)
 am__DEPENDENCIES_2 = $(top_builddir)/src/libharfbuzz.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
-hb_subset_DEPENDENCIES = $(am__DEPENDENCIES_2) \
-	$(top_builddir)/src/libharfbuzz-subset.la
+#hb_subset_DEPENDENCIES = $(am__DEPENDENCIES_2) \
+#	$(top_builddir)/src/libharfbuzz-subset.la
 am__hb_view_SOURCES_DIST = hb-view.cc options.cc options.hh \
 	main-font-text.hh shape-consumer.hh ansi-print.cc \
 	ansi-print.hh helper-cairo.cc helper-cairo.hh \
@@ -161,12 +161,12 @@ am__objects_5 = hb-view.$(OBJEXT) options.$(OBJEXT) \
 	ansi-print.$(OBJEXT) helper-cairo.$(OBJEXT) \
 	helper-cairo-ansi.$(OBJEXT) view-cairo.$(OBJEXT) \
 	$(am__objects_1)
-am_hb_view_OBJECTS = $(am__objects_5)
+##am_hb_view_OBJECTS = $(am__objects_5)
 hb_view_OBJECTS = $(am_hb_view_OBJECTS)
-hb_view_DEPENDENCIES = $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+##hb_view_DEPENDENCIES = $(am__DEPENDENCIES_2) \
+##	$(am__DEPENDENCIES_1) \
+##	$(am__DEPENDENCIES_1) \
+##	$(am__DEPENDENCIES_1)
 AM_V_P = $(am__v_P_$(V))
 am__v_P_ = $(am__v_P_$(AM_DEFAULT_VERBOSITY))
 am__v_P_0 = false
@@ -259,10 +259,10 @@ AUTOCONF = ${SHELL} /Users/Darkyen/IntelliJProjects/libgdxExperimentation/harfbu
 AUTOHEADER = ${SHELL} /Users/Darkyen/IntelliJProjects/libgdxExperimentation/harfbuzz-1.8.1/missing autoheader
 AUTOMAKE = ${SHELL} /Users/Darkyen/IntelliJProjects/libgdxExperimentation/harfbuzz-1.8.1/missing automake-1.15
 AWK = awk
-CAIRO_CFLAGS = -I/usr/local/Cellar/cairo/1.14.12/include/cairo -I/usr/local/Cellar/glib/2.56.1/include/glib-2.0 -I/usr/local/Cellar/glib/2.56.1/lib/glib-2.0/include -I/usr/local/opt/gettext/include -I/usr/local/Cellar/pcre/8.42/include -I/usr/local/Cellar/pixman/0.34.0_1/include/pixman-1 -I/usr/local/Cellar/fontconfig/2.13.0/include -I/usr/local/opt/freetype/include/freetype2 -I/usr/local/Cellar/libpng/1.6.34/include/libpng16
-CAIRO_FT_CFLAGS = -I/usr/local/Cellar/cairo/1.14.12/include/cairo -I/usr/local/Cellar/glib/2.56.1/include/glib-2.0 -I/usr/local/Cellar/glib/2.56.1/lib/glib-2.0/include -I/usr/local/opt/gettext/include -I/usr/local/Cellar/pcre/8.42/include -I/usr/local/Cellar/pixman/0.34.0_1/include/pixman-1 -I/usr/local/Cellar/fontconfig/2.13.0/include -I/usr/local/Cellar/libpng/1.6.34/include/libpng16 -I/usr/local/opt/freetype/include/freetype2
-CAIRO_FT_LIBS = -L/usr/local/Cellar/cairo/1.14.12/lib -L/usr/local/opt/freetype/lib -lcairo -lfreetype
-CAIRO_LIBS = -L/usr/local/Cellar/cairo/1.14.12/lib -lcairo
+CAIRO_CFLAGS = 
+CAIRO_FT_CFLAGS = 
+CAIRO_FT_LIBS = 
+CAIRO_LIBS = 
 CC = gcc
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
@@ -294,17 +294,17 @@ ECHO_T =
 EGREP = /usr/bin/grep -E
 EXEEXT = 
 FGREP = /usr/bin/grep -F
-FONTCONFIG_CFLAGS = -I/usr/local/Cellar/fontconfig/2.13.0/include -I/usr/local/opt/freetype/include/freetype2
-FONTCONFIG_LIBS = -L/usr/local/Cellar/fontconfig/2.13.0/lib -L/usr/local/opt/freetype/lib -lfontconfig -lfreetype
+FONTCONFIG_CFLAGS = 
+FONTCONFIG_LIBS = 
 FREETYPE_CFLAGS = -I/usr/local/opt/freetype/include/freetype2
 FREETYPE_DEPS = freetype2 >= 12.0.6
 FREETYPE_LIBS = -L/usr/local/opt/freetype/lib -lfreetype
 GCOV = 
 GENHTML = 
 GIT = ${SHELL} /Users/Darkyen/IntelliJProjects/libgdxExperimentation/harfbuzz-1.8.1/missing git
-GLIB_CFLAGS = -I/usr/local/Cellar/glib/2.56.1/include/glib-2.0 -I/usr/local/Cellar/glib/2.56.1/lib/glib-2.0/include -I/usr/local/opt/gettext/include -I/usr/local/Cellar/pcre/8.42/include
+GLIB_CFLAGS = 
 GLIB_DEPS = glib-2.0 >= 2.19.1
-GLIB_LIBS = -L/usr/local/Cellar/glib/2.56.1/lib -L/usr/local/opt/gettext/lib -lglib-2.0 -lintl -Wl,-framework -Wl,CoreFoundation
+GLIB_LIBS = 
 GLIB_MKENUMS = 
 GOBJECT_CFLAGS = 
 GOBJECT_LIBS = 
@@ -325,7 +325,7 @@ HB_VERSION_MICRO = 1
 HB_VERSION_MINOR = 8
 HTML_DIR = ${datadir}/gtk-doc/html
 ICU_CFLAGS = 
-ICU_CONFIG = no
+ICU_CONFIG = 
 ICU_LIBS = 
 INSTALL = /usr/local/bin/ginstall -c
 INSTALL_DATA = ${INSTALL} -m 644
@@ -495,17 +495,17 @@ LDADD = \
 	$(FREETYPE_LIBS) \
 	$(NULL)
 
-hb_view_SOURCES = $(HB_VIEW_sources)
-hb_view_LDADD = \
-	$(LDADD) \
-	$(CAIRO_LIBS) \
-	$(CAIRO_FT_LIBS) \
-	$(NULL)
+##hb_view_SOURCES = $(HB_VIEW_sources)
+##hb_view_LDADD = \
+##	$(LDADD) \
+##	$(CAIRO_LIBS) \
+##	$(CAIRO_FT_LIBS) \
+##	$(NULL)
 
-hb_shape_SOURCES = $(HB_SHAPE_sources)
-hb_subset_SOURCES = $(HB_SUBSET_CLI_sources)
-hb_subset_LDADD = $(LDADD) $(top_builddir)/src/libharfbuzz-subset.la
-hb_ot_shape_closure_SOURCES = $(HB_OT_SHAPE_CLOSURE_sources)
+#hb_shape_SOURCES = $(HB_SHAPE_sources)
+#hb_subset_SOURCES = $(HB_SUBSET_CLI_sources)
+#hb_subset_LDADD = $(LDADD) $(top_builddir)/src/libharfbuzz-subset.la
+#hb_ot_shape_closure_SOURCES = $(HB_OT_SHAPE_CLOSURE_sources)
 all: all-am
 
 .SUFFIXES:

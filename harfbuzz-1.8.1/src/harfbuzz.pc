@@ -9,5 +9,5 @@ Version: 1.8.1
 
 Libs: -L${libdir} -lharfbuzz
 Libs.private: -lm    
-Requires.private: glib-2.0 >= 2.19.1 
+Requires.private:  
 Cflags: -I${includedir}/harfbuzz

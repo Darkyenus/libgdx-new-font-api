@@ -107,11 +107,11 @@ am__append_2 = $(HB_OT_headers)
 am__append_3 = $(HB_FALLBACK_sources)
 am__append_4 = $(PTHREAD_CFLAGS)
 am__append_5 = $(PTHREAD_LIBS)
-am__append_6 = $(GLIB_CFLAGS)
-am__append_7 = $(GLIB_LIBS)
-am__append_8 = $(GLIB_DEPS)
-am__append_9 = $(HB_GLIB_sources)
-am__append_10 = $(HB_GLIB_headers)
+#am__append_6 = $(GLIB_CFLAGS)
+#am__append_7 = $(GLIB_LIBS)
+#am__append_8 = $(GLIB_DEPS)
+#am__append_9 = $(HB_GLIB_sources)
+#am__append_10 = $(HB_GLIB_headers)
 am__append_11 = $(FREETYPE_CFLAGS)
 am__append_12 = $(FREETYPE_LIBS)
 # XXX
@@ -173,7 +173,7 @@ am__append_50 = \
 	check-libstdc++.sh \
 	$(NULL)
 
-am__append_51 = dump-emoji
+#am__append_51 = dump-emoji
 #am__append_52 = $(gir_DATA) $(typelib_DATA)
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -225,7 +225,7 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" \
 	"$(DESTDIR)$(pkgincludedir)" "$(DESTDIR)$(pkgincludedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
-am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
+#am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
 am__DEPENDENCIES_3 = $(am__DEPENDENCIES_1)
 #am__DEPENDENCIES_4 = $(am__DEPENDENCIES_1)
 am__DEPENDENCIES_5 = $(am__DEPENDENCIES_1)
@@ -351,7 +351,7 @@ am__objects_6 = libharfbuzz_fuzzing_la-hb-fallback-shape.lo \
 	$(am__objects_1)
 am__objects_7 = $(am__objects_6)
 am__objects_8 = libharfbuzz_fuzzing_la-hb-glib.lo
-am__objects_9 = $(am__objects_8)
+#am__objects_9 = $(am__objects_8)
 am__objects_10 = libharfbuzz_fuzzing_la-hb-ft.lo
 am__objects_11 = $(am__objects_10)
 am__objects_12 = libharfbuzz_fuzzing_la-hb-graphite2.lo
@@ -372,7 +372,7 @@ am__objects_24 = $(am__objects_2) $(am__objects_3) $(am__objects_5) \
 	$(am__objects_13) $(am__objects_15) $(am__objects_17) \
 	$(am__objects_19) $(am__objects_21) $(am__objects_23)
 am__objects_25 = $(am__objects_3)
-am__objects_26 = $(am__objects_1)
+#am__objects_26 = $(am__objects_1)
 am__objects_27 = $(am__objects_1)
 #am__objects_28 = $(am__objects_1)
 #am__objects_29 = $(am__objects_1)
@@ -540,7 +540,7 @@ am__objects_44 = $(am__objects_43) $(am__objects_3)
 am__objects_45 = libharfbuzz_la-hb-fallback-shape.lo $(am__objects_1)
 am__objects_46 = $(am__objects_45)
 am__objects_47 = libharfbuzz_la-hb-glib.lo
-am__objects_48 = $(am__objects_47)
+#am__objects_48 = $(am__objects_47)
 am__objects_49 = libharfbuzz_la-hb-ft.lo
 am__objects_50 = $(am__objects_49)
 am__objects_51 = libharfbuzz_la-hb-graphite2.lo
@@ -563,18 +563,18 @@ am__objects_63 = $(am__objects_42) $(am__objects_3) $(am__objects_44) \
 am_libharfbuzz_la_OBJECTS = $(am__objects_63) $(am__objects_33)
 libharfbuzz_la_OBJECTS = $(am_libharfbuzz_la_OBJECTS)
 am__EXEEXT_1 =
-am__EXEEXT_2 =  \
-	dump-emoji$(EXEEXT)
+#am__EXEEXT_2 =  \
+#	dump-emoji$(EXEEXT)
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
 am__dump_emoji_SOURCES_DIST = dump-emoji.cc
-am_dump_emoji_OBJECTS = dump_emoji-dump-emoji.$(OBJEXT)
+#am_dump_emoji_OBJECTS = dump_emoji-dump-emoji.$(OBJEXT)
 dump_emoji_OBJECTS = $(am_dump_emoji_OBJECTS)
-dump_emoji_DEPENDENCIES =  \
-	libharfbuzz.la \
-	$(am__DEPENDENCIES_11) \
-	$(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+#dump_emoji_DEPENDENCIES =  \
+#	libharfbuzz.la \
+#	$(am__DEPENDENCIES_11) \
+#	$(am__DEPENDENCIES_1) \
+#	$(am__DEPENDENCIES_1) \
+#	$(am__DEPENDENCIES_1)
 am_dump_fon_OBJECTS = dump_fon-dump-fon.$(OBJEXT)
 dump_fon_OBJECTS = $(am_dump_fon_OBJECTS)
 dump_fon_DEPENDENCIES = libharfbuzz.la $(am__DEPENDENCIES_11)
@@ -974,10 +974,10 @@ AUTOCONF = ${SHELL} /Users/Darkyen/IntelliJProjects/libgdxExperimentation/harfbu
 AUTOHEADER = ${SHELL} /Users/Darkyen/IntelliJProjects/libgdxExperimentation/harfbuzz-1.8.1/missing autoheader
 AUTOMAKE = ${SHELL} /Users/Darkyen/IntelliJProjects/libgdxExperimentation/harfbuzz-1.8.1/missing automake-1.15
 AWK = awk
-CAIRO_CFLAGS = -I/usr/local/Cellar/cairo/1.14.12/include/cairo -I/usr/local/Cellar/glib/2.56.1/include/glib-2.0 -I/usr/local/Cellar/glib/2.56.1/lib/glib-2.0/include -I/usr/local/opt/gettext/include -I/usr/local/Cellar/pcre/8.42/include -I/usr/local/Cellar/pixman/0.34.0_1/include/pixman-1 -I/usr/local/Cellar/fontconfig/2.13.0/include -I/usr/local/opt/freetype/include/freetype2 -I/usr/local/Cellar/libpng/1.6.34/include/libpng16
-CAIRO_FT_CFLAGS = -I/usr/local/Cellar/cairo/1.14.12/include/cairo -I/usr/local/Cellar/glib/2.56.1/include/glib-2.0 -I/usr/local/Cellar/glib/2.56.1/lib/glib-2.0/include -I/usr/local/opt/gettext/include -I/usr/local/Cellar/pcre/8.42/include -I/usr/local/Cellar/pixman/0.34.0_1/include/pixman-1 -I/usr/local/Cellar/fontconfig/2.13.0/include -I/usr/local/Cellar/libpng/1.6.34/include/libpng16 -I/usr/local/opt/freetype/include/freetype2
-CAIRO_FT_LIBS = -L/usr/local/Cellar/cairo/1.14.12/lib -L/usr/local/opt/freetype/lib -lcairo -lfreetype
-CAIRO_LIBS = -L/usr/local/Cellar/cairo/1.14.12/lib -lcairo
+CAIRO_CFLAGS = 
+CAIRO_FT_CFLAGS = 
+CAIRO_FT_LIBS = 
+CAIRO_LIBS = 
 CC = gcc
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
@@ -1009,17 +1009,17 @@ ECHO_T =
 EGREP = /usr/bin/grep -E
 EXEEXT = 
 FGREP = /usr/bin/grep -F
-FONTCONFIG_CFLAGS = -I/usr/local/Cellar/fontconfig/2.13.0/include -I/usr/local/opt/freetype/include/freetype2
-FONTCONFIG_LIBS = -L/usr/local/Cellar/fontconfig/2.13.0/lib -L/usr/local/opt/freetype/lib -lfontconfig -lfreetype
+FONTCONFIG_CFLAGS = 
+FONTCONFIG_LIBS = 
 FREETYPE_CFLAGS = -I/usr/local/opt/freetype/include/freetype2
 FREETYPE_DEPS = freetype2 >= 12.0.6
 FREETYPE_LIBS = -L/usr/local/opt/freetype/lib -lfreetype
 GCOV = 
 GENHTML = 
 GIT = ${SHELL} /Users/Darkyen/IntelliJProjects/libgdxExperimentation/harfbuzz-1.8.1/missing git
-GLIB_CFLAGS = -I/usr/local/Cellar/glib/2.56.1/include/glib-2.0 -I/usr/local/Cellar/glib/2.56.1/lib/glib-2.0/include -I/usr/local/opt/gettext/include -I/usr/local/Cellar/pcre/8.42/include
+GLIB_CFLAGS = 
 GLIB_DEPS = glib-2.0 >= 2.19.1
-GLIB_LIBS = -L/usr/local/Cellar/glib/2.56.1/lib -L/usr/local/opt/gettext/lib -lglib-2.0 -lintl -Wl,-framework -Wl,CoreFoundation
+GLIB_LIBS = 
 GLIB_MKENUMS = 
 GOBJECT_CFLAGS = 
 GOBJECT_LIBS = 
@@ -1040,7 +1040,7 @@ HB_VERSION_MICRO = 1
 HB_VERSION_MINOR = 8
 HTML_DIR = ${datadir}/gtk-doc/html
 ICU_CFLAGS = 
-ICU_CONFIG = no
+ICU_CONFIG = 
 ICU_LIBS = 
 INSTALL = /usr/local/bin/ginstall -c
 INSTALL_DATA = ${INSTALL} -m 644
@@ -1526,9 +1526,9 @@ dump_myanmar_data_LDADD = libharfbuzz.la $(HBLIBS)
 dump_use_data_SOURCES = dump-use-data.cc hb-ot-shape-complex-use-table.cc
 dump_use_data_CPPFLAGS = $(HBCFLAGS)
 dump_use_data_LDADD = libharfbuzz.la $(HBLIBS)
-dump_emoji_SOURCES = dump-emoji.cc
-dump_emoji_CPPFLAGS = $(HBCFLAGS) $(FREETYPE_CFLAGS) $(CAIRO_FT_CFLAGS)
-dump_emoji_LDADD = libharfbuzz.la $(HBLIBS) $(FREETYPE_LIBS) $(CAIRO_LIBS) $(CAIRO_FT_LIBS)
+#dump_emoji_SOURCES = dump-emoji.cc
+#dump_emoji_CPPFLAGS = $(HBCFLAGS) $(FREETYPE_CFLAGS) $(CAIRO_FT_CFLAGS)
+#dump_emoji_LDADD = libharfbuzz.la $(HBLIBS) $(FREETYPE_LIBS) $(CAIRO_LIBS) $(CAIRO_FT_LIBS)
 test_ot_tag_SOURCES = hb-ot-tag.cc
 test_ot_tag_CPPFLAGS = $(HBCFLAGS) -DMAIN
 test_ot_tag_LDADD = libharfbuzz.la $(HBLIBS)

@@ -57,7 +57,7 @@ public class FontRenderCache {
      * NOTE: Result is valid only as long as font pages don't change and this method nor clear() is called (again).
      * @return array where it[font.glyph.page] == FloatArray to which vertex data should be added to
      * (usually returns the same instance) */
-    public <_Font extends Font<? extends GlyphLayout>> FloatArray[] preparePageMappingForFont(_Font font) {
+    private <_Font extends Font<? extends GlyphLayout>> FloatArray[] preparePageMappingForFont(_Font font) {
         final Texture[] fontTextures = font.getPages();
 
         final Array<FloatArray> pageVertices = this.pageVertices;
@@ -101,6 +101,82 @@ public class FontRenderCache {
         }
 
         return result;
+    }
+
+    /**
+     * Render the glyphs from glyphLayout to the cache.
+     * What is currently in the cache will be kept.
+     *
+     * @param glyphLayout with some laid out glyphs, not null
+     * @param x of the upper left corner at which text should be rendered to
+     * @param y of the upper left corner at which text should be rendered to
+     */
+    public <F extends Font<GL>, GL extends GlyphLayout<GL, F>> void addGlyphs(GlyphLayout<GL, F> glyphLayout, float x, float y) {
+        Font lastFont = null;
+        FloatArray[] pageVertices = null;
+
+        for (GlyphRun<F> run : glyphLayout.runs) {
+            final F font = run.font;
+            assert font != null;
+            if (font != lastFont) {
+                lastFont = font;
+                pageVertices = preparePageMappingForFont(font);
+            }
+
+            final int glyphAmount = run.glyphs.size;
+            final Glyph[] glyphs = run.glyphs.items;
+            final float[] glyphX = run.glyphX.items;
+            final float[] glyphY = run.glyphY.items;
+
+            final float baseX = x + run.x;
+            final float baseY = y + run.y;
+
+            for (int i = 0; i < glyphAmount; i++) {
+                final Glyph glyph = glyphs[i];
+                final int page = glyph.page;
+                if (page == -1) {
+                    continue;
+                }
+
+                final FloatArray vertexArray = pageVertices[page];
+
+                final float[] vertices = vertexArray.ensureCapacity(20);
+                int idx = vertexArray.size;
+                vertexArray.size += 20;
+
+                final float gX = baseX + glyphX[i] + glyph.xOffset;
+                final float gY = baseY + glyphY[i] + glyph.yOffset;
+                final float gX2 = gX + glyph.width;
+                final float gY2 = gY + glyph.height;
+
+                final float u = glyph.u, u2 = glyph.u2, v = glyph.v, v2 = glyph.v2;
+                final float color = run.color;
+
+                vertices[idx++] = gX;
+                vertices[idx++] = gY;
+                vertices[idx++] = color;
+                vertices[idx++] = u;
+                vertices[idx++] = v;
+
+                vertices[idx++] = gX;
+                vertices[idx++] = gY2;
+                vertices[idx++] = color;
+                vertices[idx++] = u;
+                vertices[idx++] = v2;
+
+                vertices[idx++] = gX2;
+                vertices[idx++] = gY2;
+                vertices[idx++] = color;
+                vertices[idx++] = u2;
+                vertices[idx++] = v2;
+
+                vertices[idx++] = gX2;
+                vertices[idx++] = gY;
+                vertices[idx++] = color;
+                vertices[idx++] = u2;
+                vertices[idx] = v;
+            }
+        }
     }
 
     /** Sets the position of the text, relative to its current position.

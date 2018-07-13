@@ -56,7 +56,9 @@ val experimentation by project(Archetypes.JavaProject) {
         libraryDependencies add { JUnitEngine }
     }
 
-    runOptions add {"-XstartOnFirstThread"}
+    if (System.getProperty("os.name").contains("Mac")) {
+        runOptions add {"-XstartOnFirstThread"}
+    }
     mainClass set {"com.darkyen.libgdx.HarfBuzzTest"}
 
     packResourcesTarget set { Keys.cacheDirectory.get() / "packed-resources" }
@@ -218,16 +220,3 @@ val experimentation by project(Archetypes.JavaProject) {
     }
 
 }
-
-/*val repro by project(path("repro"), Archetypes.JavaProject) {
-    projectGroup set {"com.darkyen"}
-    projectVersion set {"0.0"}
-
-    libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx", gdxVersion) }
-    libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-backend-lwjgl3", gdxVersion) }
-    libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-platform", gdxVersion, Classifier to "natives-desktop") }
-
-    runOptions add {"-XstartOnFirstThread"}
-    mainClass set {"Repro"}
-
-}*/

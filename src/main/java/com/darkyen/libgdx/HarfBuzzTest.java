@@ -201,7 +201,7 @@ public class HarfBuzzTest {
                 layout.layoutText(text, Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Align.left, null);
                 final float textX = Gdx.graphics.getWidth()/2f - layout.width()/2f;
                 final float textY = Gdx.graphics.getHeight()/2f + layout.height()/2f;
-                layout.render(cache, textX, textY);
+                cache.addGlyphs(layout, textX, textY);
 
                 batch.setProjectionMatrix(viewport.getCamera().combined);
                 batch.begin();

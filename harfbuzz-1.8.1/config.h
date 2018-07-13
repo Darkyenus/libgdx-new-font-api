@@ -8,10 +8,10 @@
 #define HAVE_ATEXIT 1
 
 /* Have cairo graphics library */
-#define HAVE_CAIRO 1
+/* #undef HAVE_CAIRO */
 
 /* Have cairo-ft support in cairo graphics library */
-#define HAVE_CAIRO_FT 1
+/* #undef HAVE_CAIRO_FT */
 
 /* Have Core Text backend */
 /* #undef HAVE_CORETEXT */
@@ -33,7 +33,7 @@
 #define HAVE_FALLBACK 1
 
 /* Have fontconfig library */
-#define HAVE_FONTCONFIG 1
+/* #undef HAVE_FONTCONFIG */
 
 /* Have FreeType 2 library */
 #define HAVE_FREETYPE 1
@@ -51,7 +51,7 @@
 #define HAVE_GETPAGESIZE 1
 
 /* Have glib2 library */
-#define HAVE_GLIB 1
+/* #undef HAVE_GLIB */
 
 /* Have gobject2 library */
 /* #undef HAVE_GOBJECT */

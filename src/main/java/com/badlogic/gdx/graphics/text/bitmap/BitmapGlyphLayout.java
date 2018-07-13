@@ -48,6 +48,10 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapGlyphLayout, BitmapFont
             run.font = font;
             run.color = textIterator.currentColor;
 
+            if ((flags & LayoutTextIterator.FLAG_FONT_CHANGE) != 0) {
+                lastCodepoint = -1;// Do not kern between fonts
+            }
+
             final Array<Glyph> glyphs = run.glyphs;
             final FloatArray glyphX = run.glyphX;
             final FloatArray glyphY = run.glyphY;

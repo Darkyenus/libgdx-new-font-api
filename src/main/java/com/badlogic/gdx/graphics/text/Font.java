@@ -48,8 +48,10 @@ public interface Font<GlyphLayout extends com.badlogic.gdx.graphics.text.GlyphLa
     void prepareGlyphs();
 
     /** @return x-advance used for missing whitespace glyphs and for tab-stop related computations */
+    @Deprecated// Is this needed?
     float getSpaceXAdvance();
 
     /** @return Y distance between two consecutive lines */
+    @Deprecated// Is this needed?
     float getLineHeight();
 }
