@@ -8,7 +8,7 @@ import com.badlogic.gdx.utils.Array;
 /**
  *
  */
-public class HBFont implements Font<HBGlyphLayout> {
+public class HBFont implements Font {
 
     @Override
     public Texture[] getPages() {
@@ -23,16 +23,6 @@ public class HBFont implements Font<HBGlyphLayout> {
     @Override
     public void prepareGlyphs() {
 
-    }
-
-    @Override
-    public float getSpaceXAdvance() {
-        return 0;
-    }
-
-    @Override
-    public float getLineHeight() {
-        return 0;
     }
 
     @Override

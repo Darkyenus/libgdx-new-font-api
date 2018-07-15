@@ -10,7 +10,7 @@ import java.util.Arrays;
 
 /** Class responsible for laying out the glyphs constructed from fonts of this font system.
  * Also stores the laid out glyphs. */
-public abstract class GlyphLayout<Self extends GlyphLayout<Self, Font>, Font extends com.badlogic.gdx.graphics.text.Font<Self>> {
+public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Font> {
 
     /** Runs of the layout. Ordered by lines and then by X coordinate (not by char positions).
      * Some runs may not contain any glyphs and serve just to specify which (non-rendered) glyphs are on which line. */

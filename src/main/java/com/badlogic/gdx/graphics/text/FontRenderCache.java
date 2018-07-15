@@ -57,7 +57,7 @@ public class FontRenderCache {
      * NOTE: Result is valid only as long as font pages don't change and this method nor clear() is called (again).
      * @return array where it[font.glyph.page] == FloatArray to which vertex data should be added to
      * (usually returns the same instance) */
-    private <_Font extends Font<? extends GlyphLayout>> FloatArray[] preparePageMappingForFont(_Font font) {
+    private <_Font extends Font> FloatArray[] preparePageMappingForFont(_Font font) {
         final Texture[] fontTextures = font.getPages();
 
         final Array<FloatArray> pageVertices = this.pageVertices;
@@ -108,7 +108,7 @@ public class FontRenderCache {
      * @param x of the upper left corner at which text should be rendered to
      * @param y of the upper left corner at which text should be rendered to
      */
-    public <F extends Font<GL>, GL extends GlyphLayout<GL, F>> void addGlyphs(GlyphLayout<GL, F> glyphLayout, float x, float y) {
+    public <F extends Font> void addGlyphs(GlyphLayout<F> glyphLayout, float x, float y) {
         Font lastFont = null;
         FloatArray[] pageVertices = null;
 

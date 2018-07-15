@@ -37,7 +37,7 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
     public static final int FLAG_LAST_REGION = 1<<6;
 
     private LayoutText<Font> text;
-    private final Array<TextRun> directionRuns = new Array<>(true, 10, TextRun.class);
+    private final Array<TextRun> textRuns = new Array<>(true, 10, TextRun.class);
 
     private int currentRun;
     private int currentRegion;
@@ -62,6 +62,7 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
      * @param text to iterate through
      */
     public void start(LayoutText<Font> text) {
+        //TODO Move currentEverything to TextRun, reordering MUST happen AFTER next() blocks are created!
         end();
         if (text.length <= 0) {
             // No point in continuing
@@ -69,7 +70,7 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
         }
         this.text = text;
 
-        evaluateBidiAndBreaksForRegion(text, directionRuns);
+        evaluateBidiAndBreaksForRegion(text, textRuns);
 
         // Initialize start values to snap to first region on first next()
         this.currentRun = -1;
@@ -113,7 +114,7 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
             // Init or last region was last of the run - advance to next run
             final int runIndex = ++this.currentRun;
 
-            final Array<TextRun> layoutRuns = this.directionRuns;
+            final Array<TextRun> layoutRuns = this.textRuns;
             if (runIndex >= layoutRuns.size) {
                 // Already at the end
                 end();
@@ -198,7 +199,7 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
                 break;
         }
 
-        if (currentEndIndex == nextRunChangeIndex && currentRun + 1 >= directionRuns.size) {
+        if (currentEndIndex == nextRunChangeIndex && currentRun + 1 >= textRuns.size) {
             changeFlags |= FLAG_LAST_REGION;
         }
 
@@ -211,8 +212,8 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
      */
     public void end() {
         this.text = null;
-        RUN_POOL.freeAll(directionRuns);
-        directionRuns.clear();
+        RUN_POOL.freeAll(textRuns);
+        textRuns.clear();
         this.currentFont = null;
 
         this.currentRun = 0;

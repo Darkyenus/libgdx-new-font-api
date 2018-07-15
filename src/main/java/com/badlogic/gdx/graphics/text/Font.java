@@ -9,7 +9,7 @@ import com.badlogic.gdx.utils.Disposable;
  *
  * This font is immutable and may never change properties after construction (or initialization).
  */
-public interface Font<GlyphLayout extends com.badlogic.gdx.graphics.text.GlyphLayout> extends Disposable {
+public interface Font extends Disposable {
 
     int MISSING_GLYPH_ID = 0;
 
@@ -46,12 +46,4 @@ public interface Font<GlyphLayout extends com.badlogic.gdx.graphics.text.GlyphLa
      * and reference valid texture areas.
      */
     void prepareGlyphs();
-
-    /** @return x-advance used for missing whitespace glyphs and for tab-stop related computations */
-    @Deprecated// Is this needed?
-    float getSpaceXAdvance();
-
-    /** @return Y distance between two consecutive lines */
-    @Deprecated// Is this needed?
-    float getLineHeight();
 }

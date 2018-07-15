@@ -9,7 +9,7 @@ package com.badlogic.gdx.graphics.text;
  * <br>
  * <b>FontSystem and related objects are NOT THREAD SAFE and should be used FROM THE RENDER THREAD ONLY, unless specified otherwise.</b>
  */
-public interface FontSystem <Font extends com.badlogic.gdx.graphics.text.Font<GlyphLayout>, GlyphLayout extends com.badlogic.gdx.graphics.text.GlyphLayout> {
+public interface FontSystem <GlyphLayout extends com.badlogic.gdx.graphics.text.GlyphLayout> {
 
     /**
      * @return a new glyph layout for rendering fonts created by this font system

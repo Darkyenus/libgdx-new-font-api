@@ -8,7 +8,7 @@ import com.badlogic.gdx.graphics.text.FontSystem;
  *
  * Create only one instance per application!
  */
-public class HBFontSystem implements FontSystem<HBFont, HBGlyphLayout> {
+public class HBFontSystem implements FontSystem<HBGlyphLayout> {
 
     /**
      * Create incrementally built font of given dimensions.

@@ -10,7 +10,7 @@ import com.badlogic.gdx.utils.GdxRuntimeException;
 /**
  * System for simple, "legacy" style, bitmap fonts, described by .fnt files.
  */
-public class BitmapFontSystem implements FontSystem<BitmapFont, BitmapGlyphLayout> {
+public class BitmapFontSystem implements FontSystem<BitmapGlyphLayout> {
 
     /**
      * This system needs no initialization, so it is exposed as stateless singleton.

@@ -203,16 +203,6 @@ public class TextLayoutIteratorTests {
         public void prepareGlyphs() {}
 
         @Override
-        public float getSpaceXAdvance() {
-            return 0f;
-        }
-
-        @Override
-        public float getLineHeight() {
-            return 0;
-        }
-
-        @Override
         public void dispose() {}
 
         @Override

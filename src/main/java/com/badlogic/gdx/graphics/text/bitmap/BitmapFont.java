@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
  * Simple 1:1 char-glyph font loaded from
  * <a href="http://www.angelcode.com/products/bmfont/doc/file_format.html">textual .fnt file</a>.
  */
-public class BitmapFont implements Font<BitmapGlyphLayout> {
+public class BitmapFont implements Font {
 
     private final String name;
 
@@ -398,16 +398,6 @@ public class BitmapFont implements Font<BitmapGlyphLayout> {
     @Override
     public void prepareGlyphs() {
         // no-op, all glyphs are already preloaded
-    }
-
-    @Override
-    public float getSpaceXAdvance() {
-        return spaceXAdvance;
-    }
-
-    @Override
-    public float getLineHeight() {
-        return lineHeight;
     }
 
     @Override

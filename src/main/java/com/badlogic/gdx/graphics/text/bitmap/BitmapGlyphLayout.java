@@ -6,7 +6,7 @@ import com.badlogic.gdx.utils.*;
 /**
  * Lays out codepoints for {@link BitmapFontSystem}.
  */
-public class BitmapGlyphLayout extends GlyphLayout<BitmapGlyphLayout, BitmapFont> {
+public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
     private static final LayoutTextIterator<BitmapFont> _textIterator = new LayoutTextIterator<>();
     private static final Array<BitmapFont> _fonts = new Array<>(true, 10, BitmapFont.class);

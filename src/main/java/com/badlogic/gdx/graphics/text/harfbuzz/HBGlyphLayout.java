@@ -6,7 +6,7 @@ import com.badlogic.gdx.utils.*;
 /**
  * Glyph layout for harf-buzz fonts.
  */
-public class HBGlyphLayout extends GlyphLayout<HBGlyphLayout, HBFont> {
+public class HBGlyphLayout extends GlyphLayout<HBFont> {
 
     // Cached instances
     private static final LayoutTextIterator<HBFont> textIterator = new LayoutTextIterator<>();
