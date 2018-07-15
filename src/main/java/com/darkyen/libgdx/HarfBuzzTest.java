@@ -2,6 +2,7 @@ package com.darkyen.libgdx;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
@@ -18,6 +19,8 @@ import com.badlogic.gdx.graphics.text.bitmap.BitmapFontSystem;
 import com.badlogic.gdx.graphics.text.bitmap.BitmapGlyphLayout;
 import com.badlogic.gdx.graphics.text.harfbuzz.HarfBuzz;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.GdxNativesLoader;
 import com.badlogic.gdx.utils.IntArray;
@@ -140,11 +143,14 @@ public class HarfBuzzTest {
             SpriteBatch batch;
             FontRenderCache cache;
             BitmapFont font;
+            BitmapFont fontBig;
             BitmapGlyphLayout layout;
             LayoutText<BitmapFont> text;
             StringBuilder sb = new StringBuilder();
 
             Texture white;
+
+            final Vector2 mouse = new Vector2();
 
             @Override
             public void create() {
@@ -153,6 +159,10 @@ public class HarfBuzzTest {
 
                 font = BitmapFontSystem.INSTANCE.createFont(
                         Gdx.files.classpath("com/badlogic/gdx/utils/arial-15.fnt"), 1f,
+                        Gdx.files.classpath("com/badlogic/gdx/utils/arial-15.png"));
+
+                fontBig = BitmapFontSystem.INSTANCE.createFont(
+                        Gdx.files.classpath("com/badlogic/gdx/utils/arial-15.fnt"), 0.5f,
                         Gdx.files.classpath("com/badlogic/gdx/utils/arial-15.png"));
 
                 layout = BitmapFontSystem.INSTANCE.createGlyphLayout();
@@ -179,6 +189,27 @@ public class HarfBuzzTest {
                         }
                         return true;
                     }
+
+                    private boolean touch(int screenX, int screenY) {
+                        mouse.set(screenX, screenY);
+                        viewport.unproject(mouse);
+                        return true;
+                    }
+
+                    @Override
+                    public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+                        return touch(screenX, screenY);
+                    }
+
+                    @Override
+                    public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+                        return touch(screenX, screenY);
+                    }
+
+                    @Override
+                    public boolean touchDragged(int screenX, int screenY, int pointer) {
+                        return touch(screenX, screenY);
+                    }
                 });
             }
 
@@ -194,7 +225,8 @@ public class HarfBuzzTest {
                         text.addRegion(i, font, Color.toFloatBits(MathUtils.random(), MathUtils.random(), MathUtils.random(), 1f));
                     }
                 }
-                text.addRegion(24, font, Color.RED.toFloatBits());
+                text.addRegion(24, fontBig, Color.RED.toFloatBits());
+                text.addRegion(40, font, Color.BLACK.toFloatBits());
 
 
                 layout.clear();
@@ -206,8 +238,25 @@ public class HarfBuzzTest {
                 batch.setProjectionMatrix(viewport.getCamera().combined);
                 batch.begin();
                 batch.enableBlending();
+                batch.setColor(1f, 1f, 1f, 1f);
                 batch.draw(white, textX, textY, layout.width(), -layout.height());
                 cache.draw(batch);
+
+                //Caret
+                final Rectangle caretRect;
+                if (Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT)) {
+                    final int caretIndex = (int) ((System.currentTimeMillis() / 700) % (text.length() + 1));
+                    caretRect = layout.getCaretPosition(caretIndex);
+                } else {
+                    final int index = layout.getIndexAt(mouse.x - textX, mouse.y  - textY, true);
+                    caretRect = layout.getCaretPosition(index);
+                }
+                if (caretRect != null) {
+                    caretRect.width = 1f;
+                    batch.setColor(0f, 0f, 0f, 1f);
+                    batch.draw(white, textX + caretRect.x, textY + caretRect.y, caretRect.width, caretRect.height);
+                }
+
                 batch.end();
 
                 cache.clear();

@@ -3,8 +3,6 @@ package com.badlogic.gdx.graphics.text.harfbuzz;
 import com.badlogic.gdx.graphics.text.*;
 import com.badlogic.gdx.utils.*;
 
-import static com.badlogic.gdx.graphics.text.harfbuzz.HarfBuzz.Font.NO_FEATURES;
-
 /**
  * Glyph layout for harf-buzz fonts.
  */
@@ -80,7 +78,7 @@ public class HBGlyphLayout extends GlyphLayout<HBGlyphLayout, HBFont> {
             // Create run
             GlyphRun<HBFont> run = GlyphRun.<HBFont>pool().obtain();
             int shapedGlyphCount = shapeBuffer.getLength();
-            run.ensureCapacity(shapedGlyphCount);
+            run.ensureGlyphCapacity(shapedGlyphCount);
 
             final IntArray results = HBGlyphLayout.results;
 

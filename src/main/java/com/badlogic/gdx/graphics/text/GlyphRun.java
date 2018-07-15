@@ -31,6 +31,8 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
         return (Pool<GlyphRun<F>>)(Pool)POOL;
     }
 
+    private static final int DEFAULT_SIZE = 32;
+
     private GlyphRun() {
     }
 
@@ -38,7 +40,7 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
     public float x, y;
     /** Line on which this run is. First line is 0. */
     public int line;
-    /** Width of the run. */
+    /** Width of the run, according to the last pen position. */
     public float width;
     /** Run color. */
     public float color;
@@ -47,12 +49,49 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
     public F font;
 
     /** Glyph indices. Must not contain nulls. */
-    public final Array<Glyph> glyphs = new Array<>(true, 64, Glyph.class);
+    public final Array<Glyph> glyphs = new Array<>(true, DEFAULT_SIZE, Glyph.class);
     /** Where the glyph pen point is, relative to run origin, which is on the top-left-most point of the line.
      * Pen point is usually on the left bottom side of the glyph and typically lies on the baseline. */
-    public final FloatArray glyphX = new FloatArray(), glyphY = new FloatArray();
+    public final FloatArray glyphX = new FloatArray(true, DEFAULT_SIZE), glyphY = new FloatArray(true, DEFAULT_SIZE);
 
-    public void ensureCapacity(int capacity) {
+    /** Range of the original text, which is drawn in this run. [start, end) */
+    public int charactersStart, charactersEnd;
+    /** True if the characters are laid out left-to-right, false if right-to-left.*/
+    public boolean charactersLtr;
+    /** For each character in [{@link #charactersStart}, {@link #charactersEnd})
+     * contains X coordinate of the <i>beginning</i> of the character. That is the left edge of glyph for left-to-right
+     * and right edge of glyph for right-to-left.
+     * <br>
+     * When <code>index+1</code> contains {@link Float#NaN}, it means that the value at <code>index</code> should
+     * be used and that these characters are together in a grapheme cluster.
+     * (This may be a genuine grapheme cluster, like <code>A + ' = Á</code>, or just UTF-16 surrogate pair.)
+     * There may be multiple consecutive {@link Float#NaN}s.
+     * <br>
+     * Clusters should be treated as one character when moving caret, deleting or selecting.
+     * <br>
+     * These values generally hold no relation to {@link #glyphs}. To determine the <i>end</i> of the character/cluster,
+     * <i>beginning</i> coordinate of next cluster should be used. If there is no such cluster, use position of the next
+     * run (which may be on a new line - when drawing such selection, feel free to use {@link #width}).
+     * If there is no next run, use {@link #width}, unless the last character of this run is <code>\n</code>
+     * (which is signified by {@link #charactersLinebreak}), in which case beginning of next line should be used.*/
+    public final FloatArray characterPositions = new FloatArray(true, DEFAULT_SIZE);
+    /** True if this run ends with a linebreak. Used when positioning caret. */
+    public boolean charactersLinebreak;
+
+
+    /**
+     * @return width of the run, extended by draw bounds of last glyph, if those protrude {@link #width}
+     */
+    public float getDrawWidth() {
+        final int lastIndex = glyphs.size - 1;
+        if (lastIndex >= 0) {
+            final Glyph lastGlyph = glyphs.items[lastIndex];
+            return Math.max(this.width, glyphX.items[lastIndex] + lastGlyph.xOffset + lastGlyph.width);
+        }
+        return this.width;
+    }
+
+    public void ensureGlyphCapacity(int capacity) {
         glyphs.ensureCapacity(capacity);
         glyphX.ensureCapacity(capacity);
         glyphY.ensureCapacity(capacity);
@@ -62,9 +101,13 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
     public void reset() {
         line = 0;
         width = 0;
+        charactersStart = charactersEnd = -1;
+        charactersLtr = true;
+        charactersLinebreak = false;
 
         glyphs.clear();
         glyphX.clear();
         glyphY.clear();
+        characterPositions.clear();
     }
 }
