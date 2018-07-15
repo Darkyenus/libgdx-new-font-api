@@ -136,7 +136,9 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapGlyphLayout, BitmapFont
         int lineFontsFrom = 0;
 
         int flags;
+        boolean hadRegions = false;
         while ((flags = textIterator.next()) != 0) {
+            hadRegions = true;
             final int runStart = textIterator.currentStartIndex;
             final int runEnd = textIterator.currentEndIndex;
 
@@ -219,10 +221,17 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapGlyphLayout, BitmapFont
             }
         }
 
-        for (BitmapFont font : fonts) {
-            font.prepareGlyphs();
+        if (hadRegions) {
+            for (BitmapFont font : fonts) {
+                font.prepareGlyphs();
+            }
+            fonts.clear();
+        } else {
+            // At least one line must be always present, even if there is no region
+            final BitmapFont initialFont = text.fontAt(0);
+            lineHeights.add(height = initialFont.lineHeight);
         }
-        fonts.clear();
+
         textIterator.end();
 
         buildCharPositions();

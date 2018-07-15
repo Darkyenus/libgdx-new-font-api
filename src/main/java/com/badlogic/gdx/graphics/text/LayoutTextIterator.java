@@ -37,7 +37,7 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
     public static final int FLAG_LAST_REGION = 1<<6;
 
     private LayoutText<Font> text;
-    private final Array<LayoutRun> layoutRuns = new Array<>(true, 10, LayoutRun.class);
+    private final Array<TextRun> directionRuns = new Array<>(true, 10, TextRun.class);
 
     private int currentRun;
     private int currentRegion;
@@ -69,7 +69,7 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
         }
         this.text = text;
 
-        evaluateBidiAndBreaksForRegion(text, layoutRuns);
+        evaluateBidiAndBreaksForRegion(text, directionRuns);
 
         // Initialize start values to snap to first region on first next()
         this.currentRun = -1;
@@ -113,14 +113,14 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
             // Init or last region was last of the run - advance to next run
             final int runIndex = ++this.currentRun;
 
-            final Array<LayoutRun> layoutRuns = this.layoutRuns;
+            final Array<TextRun> layoutRuns = this.directionRuns;
             if (runIndex >= layoutRuns.size) {
                 // Already at the end
                 end();
                 return 0;
             }
 
-            final LayoutRun run = layoutRuns.get(runIndex);
+            final TextRun run = layoutRuns.get(runIndex);
 
             currentStartIndex = run.start;
             final int region = this.currentRegion = text.regionAt(run.start);
@@ -198,7 +198,7 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
                 break;
         }
 
-        if (currentEndIndex == nextRunChangeIndex && currentRun + 1 >= layoutRuns.size) {
+        if (currentEndIndex == nextRunChangeIndex && currentRun + 1 >= directionRuns.size) {
             changeFlags |= FLAG_LAST_REGION;
         }
 
@@ -211,8 +211,8 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
      */
     public void end() {
         this.text = null;
-        RUN_POOL.freeAll(layoutRuns);
-        layoutRuns.clear();
+        RUN_POOL.freeAll(directionRuns);
+        directionRuns.clear();
         this.currentFont = null;
 
         this.currentRun = 0;
@@ -227,10 +227,10 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
 
     /**
      * Separate text into layout runs, whose boundaries are defined by their bidi levels, tab stops (\n) and by linebreaks (\n).
-     * Runs on line are then reordered by their bidi order. At least one {@link LayoutRun} will be always added.
+     * Runs on line are then reordered by their bidi order. At least one {@link TextRun} will be always added.
      * @param out array to which runs are added to. Runs should be freed to {@link #RUN_POOL}
      */
-    private static void evaluateBidiAndBreaksForRegion(LayoutText text, Array<LayoutRun> out) {
+    private static void evaluateBidiAndBreaksForRegion(LayoutText text, Array<TextRun> out) {
         final boolean allLtr;
         Bidi usedBidi = null;
 
@@ -255,8 +255,10 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
                 allLtr = true;
             } else if (bidi.isRightToLeft()) {
                 allLtr = false;
-            } else if (bidi.getRunCount() <= 1) {
+            } else if (bidi.getRunCount() < 1) {
                 // Should not happen
+                allLtr = text.leftToRight;
+            } else if (bidi.getRunCount() == 1) {
                 allLtr = (bidi.getLevelAt(0) & 1) == 0;
             } else {
                 // Not homogenous.
@@ -271,7 +273,7 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
         if (usedBidi == null) {
             int index = 0;
             do {
-                final LayoutRun run = RUN_POOL.obtain();
+                final TextRun run = RUN_POOL.obtain();
                 run.start = index;
                 run.end = index = runBreakIndex(chars, index, length);
                 run.ltr = allLtr;
@@ -298,7 +300,7 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
             while (true) {
                 if (lineEnd <= runEnd) {
                     // Line break is earlier
-                    LayoutRun run = RUN_POOL.obtain();
+                    TextRun run = RUN_POOL.obtain();
                     run.start = index;
                     run.end = lineEnd;
                     int runLevel = usedBidi.getRunLevel(runIndex);
@@ -327,7 +329,7 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
                     lineEnd = runBreakIndex(chars, lineEnd, length);
                 } else {
                     // Run-end is earlier
-                    LayoutRun run = RUN_POOL.obtain();
+                    TextRun run = RUN_POOL.obtain();
                     run.start = index;
                     run.end = runEnd;
                     int runLevel = usedBidi.getRunLevel(runIndex);
@@ -355,8 +357,8 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
         }
     }
 
-    private static boolean assertLayoutRunsValid(Array<LayoutRun> runs) {
-        for (LayoutRun run : runs) {
+    private static boolean assertLayoutRunsValid(Array<TextRun> runs) {
+        for (TextRun run : runs) {
             assert run.start >= 0;
             assert run.start < run.end;
         }
@@ -378,12 +380,12 @@ public final class LayoutTextIterator<Font extends com.badlogic.gdx.graphics.tex
         return (level & 1) == 0;
     }
 
-    private static final class LayoutRun {
+    private static final class TextRun {
         /** Positions into the original text. Never 0-length. */
         public int start, end;
         /** If false, text should be laid out left-to-right. */
         public boolean ltr;
     }
 
-    private static final Pool<LayoutRun> RUN_POOL = Pools.get(LayoutRun.class, 20);
+    private static final Pool<TextRun> RUN_POOL = Pools.get(TextRun.class, 20);
 }

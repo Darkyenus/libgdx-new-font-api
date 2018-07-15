@@ -91,13 +91,10 @@ public class FontRenderCache {
         // Now that internal indices are stable, we can return them
         for (int i = 0; i < pageCount; i++) {
             final Texture texture = fontTextures[i];
-            if (texture == null) {
-                continue;
-            }
 
             int index = Arrays.binarySearch(pageTextures.items, 0, pageTextures.size, texture, TEXTURE_COMPARATOR);
             assert index >= 0;
-            result[i] = pageVertices.get(i);
+            result[i] = pageVertices.get(index);
         }
 
         return result;

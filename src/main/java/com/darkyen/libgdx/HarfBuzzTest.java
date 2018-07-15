@@ -142,8 +142,7 @@ public class HarfBuzzTest {
             ScreenViewport viewport = new ScreenViewport();
             SpriteBatch batch;
             FontRenderCache cache;
-            BitmapFont font;
-            BitmapFont fontBig;
+            BitmapFont font, fontBold, fontItalic;
             BitmapGlyphLayout layout;
             LayoutText<BitmapFont> text;
             StringBuilder sb = new StringBuilder();
@@ -158,12 +157,11 @@ public class HarfBuzzTest {
                 cache = new FontRenderCache();
 
                 font = BitmapFontSystem.INSTANCE.createFont(
-                        Gdx.files.classpath("com/badlogic/gdx/utils/arial-15.fnt"), 1f,
-                        Gdx.files.classpath("com/badlogic/gdx/utils/arial-15.png"));
-
-                fontBig = BitmapFontSystem.INSTANCE.createFont(
-                        Gdx.files.classpath("com/badlogic/gdx/utils/arial-15.fnt"), 0.5f,
-                        Gdx.files.classpath("com/badlogic/gdx/utils/arial-15.png"));
+                        Gdx.files.local("test-fonts/some-time-later/some-time-later-regular64.fnt"), 2f);
+                fontBold = BitmapFontSystem.INSTANCE.createFont(
+                        Gdx.files.local("test-fonts/some-time-later/some-time-later-bold64.fnt"), 2f);
+                fontItalic = BitmapFontSystem.INSTANCE.createFont(
+                        Gdx.files.local("test-fonts/some-time-later/some-time-later-italic64.fnt"), 2f);
 
                 layout = BitmapFontSystem.INSTANCE.createGlyphLayout();
 
@@ -219,14 +217,16 @@ public class HarfBuzzTest {
                 Gdx.gl.glClear(GL_COLOR_BUFFER_BIT);
 
                 text.init(sb.chars, sb.length, font, Color.ROYAL.toFloatBits(), null, null, true);
-                text.addRegion(6, font, Color.BLUE.toFloatBits());
-                for (int i = 18; i < 24; i++) {
+                text.addRegion(5, fontItalic, Color.BLUE.toFloatBits());
+                /*for (int i = 18; i < 24; i++) {
                     if (MathUtils.randomBoolean()) {
                         text.addRegion(i, font, Color.toFloatBits(MathUtils.random(), MathUtils.random(), MathUtils.random(), 1f));
                     }
                 }
                 text.addRegion(24, fontBig, Color.RED.toFloatBits());
-                text.addRegion(40, font, Color.BLACK.toFloatBits());
+                text.addRegion(40, fontSponge, Color.BLACK.toFloatBits());*/
+                text.addRegion(15, fontBold, Color.BLACK.toFloatBits());
+                text.addRegion(25, font, Color.BLACK.toFloatBits());
 
 
                 layout.clear();

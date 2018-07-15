@@ -167,6 +167,24 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         }
     }
 
+    public Font fontAt(int index) {
+        final IntArray regionStarts = this.regionStarts;
+        final int regionCount = regionStarts.size;
+        final int[] regionStartsItems = regionStarts.items;
+
+        if (index < 0 || regionCount <= 0 || index < regionStartsItems[0]) {
+            return initialFont;
+        } else {
+            int regionIndex = Arrays.binarySearch(regionStartsItems, 0, regionCount, index);
+            if (regionIndex < 0) {
+                // Index is not directly at the start of some region...
+                int insertionPoint = -regionIndex - 1;
+                regionIndex = insertionPoint - 1;
+            }
+            return regionFonts.items[regionIndex];
+        }
+    }
+
     /**
      * Find index of tab stop which belongs to the text found at given x.
      * Returns valid index for {@link #tabStopOffsetFor}.

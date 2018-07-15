@@ -27,7 +27,7 @@ public class BitmapFontSystem implements FontSystem<BitmapFont, BitmapGlyphLayou
      * @param fnt .fnt file describing the font
      */
     public BitmapFont createFont(FileHandle fnt, float pixelsPerPoint) {
-        final BitmapFont font = new BitmapFont();
+        final BitmapFont font = new BitmapFont(fnt.nameWithoutExtension());
         // Load glyphs
         final String[] pagePaths = font.loadGlyphs(fnt, pixelsPerPoint);
 
@@ -48,7 +48,7 @@ public class BitmapFontSystem implements FontSystem<BitmapFont, BitmapGlyphLayou
      * @param imageFiles corresponding to the pages
      */
     public BitmapFont createFont(FileHandle fnt, float pixelsPerPoint, FileHandle...imageFiles) {
-        final BitmapFont font = new BitmapFont();
+        final BitmapFont font = new BitmapFont(fnt.nameWithoutExtension());
         // Load glyphs
         final String[] pagePaths = font.loadGlyphs(fnt, pixelsPerPoint);
 
@@ -74,7 +74,7 @@ public class BitmapFontSystem implements FontSystem<BitmapFont, BitmapGlyphLayou
      * @param atlas in which texture pages should be searched in
      */
     public BitmapFont createFont(FileHandle fnt, float pixelsPerPoint, TextureAtlas atlas) {
-        final BitmapFont font = new BitmapFont();
+        final BitmapFont font = new BitmapFont(fnt.nameWithoutExtension());
         // Load glyphs
         final String[] pagePaths = font.loadGlyphs(fnt, pixelsPerPoint);
 

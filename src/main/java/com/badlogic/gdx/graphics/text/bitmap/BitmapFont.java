@@ -23,6 +23,8 @@ import java.util.regex.Pattern;
  */
 public class BitmapFont implements Font<BitmapGlyphLayout> {
 
+    private final String name;
+
     static private final byte STATE_INITIAL = 0;
     static private final byte STATE_GLYPHS_LOADED = 1;
     static private final byte STATE_INITIALIZED_OWNS_PAGES = 2;
@@ -52,6 +54,10 @@ public class BitmapFont implements Font<BitmapGlyphLayout> {
     private LongArray kerning = null;
 
     private static final long MASK_21BITS = 0x1F_FFFFL;
+
+    public BitmapFont(String name) {
+        this.name = name;
+    }
 
     private long packKerning(int first, int second, int clampedKerning) {
         return ((first & MASK_21BITS) << 42) | ((second & MASK_21BITS) << 21) | clampedKerning;
@@ -413,6 +419,11 @@ public class BitmapFont implements Font<BitmapGlyphLayout> {
         }
         pages.clear();
         state = STATE_DISPOSED;
+    }
+
+    @Override
+    public String toString() {
+        return name;
     }
 
     public static final class BitmapGlyph extends Glyph {
