@@ -1,6 +1,7 @@
 package com.badlogic.gdx.graphics.text.bitmap;
 
 import com.badlogic.gdx.graphics.text.*;
+import com.badlogic.gdx.graphics.text.LayoutTextRunIterable.TextRun;
 import com.badlogic.gdx.utils.*;
 
 /**
@@ -8,7 +9,6 @@ import com.badlogic.gdx.utils.*;
  */
 public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
-    private static final LayoutTextIterator<BitmapFont> _textIterator = new LayoutTextIterator<>();
     private static final Array<BitmapFont> _fonts = new Array<>(true, 10, BitmapFont.class);
 
     private int lastCodepoint = -1; // For kerning
@@ -129,28 +129,27 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         startX = 0f;
         float lineStartY = 0f;
 
-        LayoutTextIterator<BitmapFont> textIterator = BitmapGlyphLayout._textIterator;
-        textIterator.start(text);
+        final LayoutTextRunIterable<BitmapFont> iterable = LayoutTextRunIterable.obtain(text);
 
         Array<BitmapFont> fonts = _fonts;
         int lineFontsFrom = 0;
 
-        int flags;
         boolean hadRegions = false;
-        while ((flags = textIterator.next()) != 0) {
+        BitmapFont lastFont = null;
+        for (TextRun<BitmapFont> region : iterable) {
             hadRegions = true;
-            final int runStart = textIterator.currentStartIndex;
-            final int runEnd = textIterator.currentEndIndex;
 
-            final boolean lastRegion = (flags & LayoutTextIterator.FLAG_LAST_REGION) != 0;
-            final boolean lastOnLine = (flags & LayoutTextIterator.FLAG_LINE_BREAK) != 0;
-            if ((flags & LayoutTextIterator.FLAG_FONT_CHANGE) != 0) {
+            final int flags = region.flags;
+            final boolean lastRegion = (flags & TextRun.FLAG_LAST_RUN) != 0;
+            final boolean lastOnLine = (flags & TextRun.FLAG_LINE_BREAK) != 0;
+            if (lastFont != region.font) {
                 lastCodepoint = -1;// Do not kern between fonts
+                lastFont = region.font;
             }
 
             final int newRunsStart = runs.size;
             // Add the run(s)
-            addRunsFor(chars, runStart, runEnd, line, textIterator.currentFont, textIterator.currentLtr, textIterator.currentColor);
+            addRunsFor(chars, region.start, region.end, line, region.font, (flags & TextRun.FLAG_LTR) != 0, region.color);
 
             //TODO Line wrapping, \n and \t handling
 
@@ -179,7 +178,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                 float baselineToDown = 0f;
                 if (lineFontsFrom == fonts.size) {
                     // No fonts on line, use only current run font
-                    final BitmapFont font = textIterator.currentFont;
+                    final BitmapFont font = region.font;
                     topToBaseline = font.base;
                     baselineToDown = font.lineHeight - font.base;
                 } else {
@@ -213,13 +212,14 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
                 if (lastRegion && lastOnLine) {
                     // Last line ends with \n, there should be additional new line with the height of current font
-                    final float trailingLineHeight = textIterator.currentFont.lineHeight;
+                    final float trailingLineHeight = region.font.lineHeight;
                     lineStartY -= trailingLineHeight;
                     lineHeights.add(-lineStartY);
                     height = -lineStartY;
                 }
             }
         }
+        LayoutTextRunIterable.free(iterable);
 
         if (hadRegions) {
             for (BitmapFont font : fonts) {
@@ -231,8 +231,6 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             final BitmapFont initialFont = text.fontAt(0);
             lineHeights.add(height = initialFont.lineHeight);
         }
-
-        textIterator.end();
 
         buildCharPositions();
     }

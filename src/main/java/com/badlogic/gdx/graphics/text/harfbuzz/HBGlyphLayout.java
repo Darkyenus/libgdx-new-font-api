@@ -9,7 +9,6 @@ import com.badlogic.gdx.utils.*;
 public class HBGlyphLayout extends GlyphLayout<HBFont> {
 
     // Cached instances
-    private static final LayoutTextIterator<HBFont> textIterator = new LayoutTextIterator<>();
     private static final IntArray results = new IntArray();
 
     /*
@@ -34,8 +33,6 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
         Text is NOT split by different coloring, this is supplied later retroactively.
          */
 
-        LayoutTextIterator<HBFont> textIterator = HBGlyphLayout.textIterator;
-        textIterator.start(text);
 
         HarfBuzz.Buffer shapeBuffer = HarfBuzz.Buffer.create();//TODO allocation
 
@@ -110,7 +107,6 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
         //TODO Line wrapping, \n and \t handling
 
         shapeBuffer.destroy();
-        textIterator.end();
     }
 
 
