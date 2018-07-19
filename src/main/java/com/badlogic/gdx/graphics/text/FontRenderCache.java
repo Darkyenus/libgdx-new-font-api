@@ -120,7 +120,8 @@ public class FontRenderCache {
                 pageVertices = preparePageMappingForFont(font);
             }
 
-            //TODO Reverse mirrored glyphs on mirrored runs (but how to detect mirrored characters?) (https://www.compart.com/en/unicode/mirrored)
+            final boolean flipMirrored = !run.isLtr();
+
             final int glyphAmount = run.glyphs.size;
             final Glyph[] glyphs = run.glyphs.items;
             final float[] glyphX = run.glyphX.items;
@@ -142,10 +143,17 @@ public class FontRenderCache {
                 int idx = vertexArray.size;
                 vertexArray.size += 20;
 
-                final float gX = baseX + glyphX[i] + glyph.xOffset;
-                final float gY = baseY + glyphY[i] + glyph.yOffset;
-                final float gX2 = gX + glyph.width;
-                final float gY2 = gY + glyph.height;
+                float gX = baseX + glyphX[i] + glyph.xOffset;
+                float gY = baseY + glyphY[i] + glyph.yOffset;
+                float gX2 = gX + glyph.width;
+                float gY2 = gY + glyph.height;
+
+                if (flipMirrored && (glyph.flags & Glyph.FLAG_MIRRORED) != 0) {
+                    // Flip RTL mirrored glyphs (https://www.compart.com/en/unicode/mirrored)
+                    float tmp = gX;
+                    gX = gX2;
+                    gX2 = tmp;
+                }
 
                 final float u = glyph.u, u2 = glyph.u2, v = glyph.v, v2 = glyph.v2;
                 final float color = run.color;

@@ -11,10 +11,17 @@ package com.badlogic.gdx.graphics.text;
  */
 public class Glyph implements Comparable<Glyph> {
 
+    /** This glyph should be rendered mirrored when the {@link GlyphRun} it is in is RTL. */
+    public static final byte FLAG_MIRRORED = 1;
+
     /** Glyph ID this corresponds to. */
     public final int glyphId;
     /** Page on which this glyph is, or -1 if this glyph has no graphic representation. */
-    public int page = -1;
+    public short page = -1;
+    /** Additional properties of the glyph. Flags are "allocated" from least significant bit.
+     * Subclasses may allocate from most significant bit for their own uses, to prevent conflicts in the future.
+     * @see Glyph#FLAG_MIRRORED */
+    public byte flags = 0;
     /** Texture coordinates on which this glyph appears on specified page. */
     public float u = 0f, v = 0f, u2 = 0f, v2 = 0f;
 

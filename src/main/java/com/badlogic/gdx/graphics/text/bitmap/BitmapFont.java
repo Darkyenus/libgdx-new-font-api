@@ -76,6 +76,13 @@ public class BitmapFont implements Font<BitmapFont> {
             // Retrieval assumes, that 0-amount kernings are not stored
             return;
         }
+        final BitmapGlyph leftGlyph = getGlyph(firstGlyph);
+        final BitmapGlyph rightGlyph = getGlyph(secondGlyph);
+        if (leftGlyph == null || rightGlyph == null) {
+            // Do not store kernings for glyphs not in the font
+            return;
+        }
+
         LongArray kerning = this.kerning;
         if (kerning == null) {
             kerning = this.kerning = new LongArray(true, 64);
@@ -88,14 +95,21 @@ public class BitmapFont implements Font<BitmapFont> {
         }
         insertPoint = -insertPoint - 1;
         kerning.insert(insertPoint, key);
+
+        leftGlyph.flags |= BitmapGlyph.FLAG_KERNING_LEFT;
+        rightGlyph.flags |= BitmapGlyph.FLAG_KERNING_RIGHT;
     }
 
-    public int getKerning(int firstGlyph, int secondGlyph) {
+    public int getKerning(BitmapGlyph firstGlyph, BitmapGlyph secondGlyph) {
+        if ((firstGlyph.flags & BitmapGlyph.FLAG_KERNING_LEFT) == 0 || (secondGlyph.flags & BitmapGlyph.FLAG_KERNING_RIGHT) == 0) {
+            return 0;
+        }
+
         final LongArray kerning = this.kerning;
         if (kerning == null) {
             return 0;
         }
-        final long key = packKerning(firstGlyph, secondGlyph, 0);
+        final long key = packKerning(firstGlyph.glyphId, secondGlyph.glyphId, 0);
         // As kerning may never be 0, we can safely assume, that returned index is always negative
         final int index = -Arrays.binarySearch(kerning.items, 0, kerning.size, key) -1;
         if (index < 0 || index >= kerning.size) {
@@ -217,12 +231,12 @@ public class BitmapFont implements Font<BitmapFont> {
                     fallbackXAdvance = xAdvance;
                 }
 
-                int page = 0;
+                short page = 0;
                 // Check for page safely, it could be omitted or invalid.
                 if (tokens.hasMoreTokens()) tokens.nextToken();
                 if (tokens.hasMoreTokens()) {
                     try {
-                        page = Integer.parseInt(tokens.nextToken());
+                        page = Short.parseShort(tokens.nextToken());
                     } catch (NumberFormatException ignored) {
                     }
                 }
@@ -435,13 +449,16 @@ public class BitmapFont implements Font<BitmapFont> {
 
     public static final class BitmapGlyph extends Glyph {
 
+        public static final byte FLAG_KERNING_LEFT = (byte) (1 << 7);
+        public static final byte FLAG_KERNING_RIGHT = (byte) (1 << 6);
+
         /** Position in source texture, as defined in fnt file. */
         final short srcX, srcY, srcWidth, srcHeight;
 
         /** Layout related information: x-amount by which the pen point should move after writing this glyph */
         public final float xAdvance;
 
-        BitmapGlyph(int glyphId, int page,
+        BitmapGlyph(int glyphId, short page,
                     short srcX, short srcY, short srcWidth, short srcHeight,
                     float xOffset, float yOffset, float width, float height, float xAdvance) {
             super(glyphId);

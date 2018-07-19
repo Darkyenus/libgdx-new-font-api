@@ -83,7 +83,7 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
      * If there is no next run, use {@link #width}, unless the last character of this run is <code>\n</code>
      * (which is signified by {@link GlyphRun#FLAG_LINEBREAK}), in which case beginning of next line should be used.*/
     public final FloatArray characterPositions = new FloatArray(true, DEFAULT_SIZE);
-    /** Content related flags.
+    /** Content related flags. GlyphLayout may put own flags here, allocate them from most significant bit.
      * @see GlyphRun#FLAG_LINEBREAK
      * @see GlyphRun#FLAG_TAB_LEFT and friends */
     public byte charactersFlags;
@@ -103,7 +103,7 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
     }
 
     public boolean isLtr() {
-        return (charactersLevel & 1) == 0;
+        return LayoutTextRunIterable.TextRun.isLevelLtr(charactersLevel);
     }
 
     public void ensureGlyphCapacity(int capacity) {
