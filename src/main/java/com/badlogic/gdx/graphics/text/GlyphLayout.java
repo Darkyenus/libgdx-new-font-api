@@ -65,7 +65,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
             final int item = charRuns.items[i];
             final int characterStart = item >> 15;
             final int runIndex = item & 0x7FFF;
-            assert characterStart > lastCharStart;
+            assert characterStart > lastCharStart : characterStart +" > "+ lastCharStart;
             lastCharStart = characterStart;
 
             assert runs.items[runIndex].charactersStart == characterStart;

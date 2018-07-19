@@ -111,13 +111,6 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
         }
 
         while (true) {
-            @SuppressWarnings("unchecked")
-            final TextRun<F> run = RUN_POOL.obtain();
-            run.start = index;
-            run.color = color;
-            run.font = font;
-            run.level = level;
-
             // Compute new end
             F nextFont = null;
             float nextColor = 0f;
@@ -142,6 +135,14 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
             // Compute new final end index
             final int endIndex = Math.min(regionEndIndex, end);
             assert endIndex > index;
+
+            // Create the run
+            @SuppressWarnings("unchecked")
+            final TextRun<F> run = RUN_POOL.obtain();
+            run.start = index;
+            run.color = color;
+            run.font = font;
+            run.level = level;
             run.end = index = endIndex;
             textRuns.add(run);
 
@@ -347,7 +348,10 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
         }
     }
 
-    private static final Pool<TextRun> RUN_POOL = Pools.get(TextRun.class, 20);
+    /* Max capacity translates to this many characters until GC starts running:
+        worst case: MAX characters
+        best case: maxRunLength * MAX */
+    private static final Pool<TextRun> RUN_POOL = Pools.get(TextRun.class, 1024);
     /* Not exposed directly because of problems with generics */
     private static final Pool<LayoutTextRunIterable> ITERABLE_POOL = Pools.get(LayoutTextRunIterable.class, 10);
 }

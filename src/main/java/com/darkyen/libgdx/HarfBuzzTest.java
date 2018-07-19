@@ -259,9 +259,9 @@ public class HarfBuzzTest {
                 for (int i = 0; i < 100; i++) {
                     layout.layoutText(text, 300f, Float.POSITIVE_INFINITY, Align.left, null);
                 }
-                final long duration = TimeUnit.NANOSECONDS.toMillis((System.nanoTime() - layoutStart) / 100);
+                final double duration = (System.nanoTime() - layoutStart) / 100_000_000.0;
                 if (Gdx.input.isKeyPressed(Input.Keys.F1)) {
-                    System.out.println(duration+" ms");
+                    System.out.printf("%.3f ms\n", duration);
                 }
 
                 final float textX = Gdx.graphics.getWidth()/2f - layout.width()/2f;

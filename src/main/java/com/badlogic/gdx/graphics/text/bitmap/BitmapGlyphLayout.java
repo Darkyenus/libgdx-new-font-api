@@ -31,6 +31,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
     private void addLinebreakRunFor(final TextRun<BitmapFont> textRun, final int line) {
         final int runStart = textRun.start;
         final int runEnd = textRun.end;
+        assert runStart < runEnd;
 
         final GlyphRun<BitmapFont> run = GlyphRun.<BitmapFont>pool().obtain();
 
@@ -57,6 +58,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
     private void addTabStopRunFor(final LayoutText<BitmapFont> text, final TextRun<BitmapFont> textRun, final int line) {
         final int runStart = textRun.start;
         final int runEnd = textRun.end;
+        assert runStart < runEnd;
 
         final GlyphRun<BitmapFont> run = GlyphRun.<BitmapFont>pool().obtain();
 
@@ -108,7 +110,9 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
     }
 
     /** @return number of added runs (must be >= 1) */
-    private int addRunsFor(final char[] chars, final int runStart, final int runEnd, final byte level, final BitmapFont font, final float color, final int line, int insertIndex) {
+    private int addRunsFor(final char[] chars, final int runStart, final int runEnd, final byte level,
+                           final BitmapFont font, final float color, final int line, int insertIndex) {
+        assert runStart < runEnd;
         final boolean ltr = TextRun.isLevelLtr(level);
 
         final GlyphRun<BitmapFont> run = GlyphRun.<BitmapFont>pool().obtain();
@@ -354,7 +358,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
         final GlyphRun<BitmapFont> splitRun = runs.items[runIndex];
         // No splitting necessary?
-        if (splitIndex < splitRun.charactersStart) {
+        if (splitIndex <= splitRun.charactersStart) {
             return runIndex;
         } else if (splitIndex >= splitRun.charactersEnd) {
             // No splitting necessary
@@ -420,7 +424,6 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             }
 
             // Wrapping
-            wrapping:
             while (startX >= availableWidth) {
                 assert lineLaidRuns < runs.size;
 
@@ -453,7 +456,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
                 // Find suitable breaking point
                 final int lineCharactersStart = runs.items[lineLaidRuns].charactersStart;
-                final int lineCharactersEnd = runs.items[runs.size-1].charactersEnd;
+                final int lineCharactersEnd = runs.items[runs.size - 1].charactersEnd;
                 final BreakIterator lineBreakIterator = getLineBreakIterator(
                         text, lineCharactersStart, lineCharactersEnd);
                 // Character wrap index denotes the first character, which should already be on a new line
@@ -470,7 +473,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                         // Not much to do here, we only have one character to work with and we can't wrap that.
                         // Just mark the line as ended for normal line-ending code below
                         completeLine = true;
-                        break wrapping;
+                        break;// no more wrapping
                     }
                 }
 
@@ -533,7 +536,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                     final GlyphRun<BitmapFont> run = runs.items[i];
                     run.x = startX;
                     startX += run.width;
-                    assert run.line == line-1;
+                    assert run.line == line - 1;
                     run.line = line;
                 }
 

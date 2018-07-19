@@ -14,7 +14,7 @@ import com.badlogic.gdx.utils.Pool;
 public final class GlyphRun<F extends Font> implements Pool.Poolable {
 
     @SuppressWarnings("unchecked")
-    private static final Pool<GlyphRun> POOL = new Pool<GlyphRun>() {
+    private static final Pool<GlyphRun> POOL = new Pool<GlyphRun>(64, 2048) {
         @Override
         protected GlyphRun newObject() {
             return new GlyphRun();
