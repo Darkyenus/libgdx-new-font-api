@@ -1,8 +1,6 @@
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.text.Font;
-import com.badlogic.gdx.graphics.text.Glyph;
-import com.badlogic.gdx.graphics.text.LayoutText;
-import com.badlogic.gdx.graphics.text.LayoutTextIterator;
+import com.badlogic.gdx.graphics.text.*;
+import com.badlogic.gdx.graphics.text.LayoutTextRunIterable.TextRun;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.FloatArray;
 import com.badlogic.gdx.utils.IntArray;
@@ -91,22 +89,21 @@ public class TextLayoutIteratorTests {
             }
         }
 
-        LayoutTextIterator<TestFont> iterator = new LayoutTextIterator<>();
-        iterator.start(layoutText);
+        final LayoutTextRunIterable<TestFont> runIterable = LayoutTextRunIterable.obtain(layoutText);
 
         int i = 0;
         boolean firstRegion = true;
         boolean lastRegion = false;
-        int flags;
-        while ((flags = iterator.next()) != 0) {
-            String regionText = text.substring(iterator.currentStartIndex, iterator.currentEndIndex);
+        int textIndex = 0;
+        for (TextRun<TestFont> run : runIterable) {
+            final byte flags = run.flags;
+
+            String regionText = text.substring(run.start, run.end);
 
             if (i > expected.length) {
                 fail("No more regions expected, but got: '"+regionText+"'");
             }
 
-            boolean colorChangeExpected = false;
-            boolean fontChangeExpected = false;
             stringFound: {
                 while (i < expected.length) {
                     Object expectedItem = expected[i++];
@@ -116,10 +113,8 @@ public class TextLayoutIteratorTests {
                     } else if (expectedItem instanceof Character && (Character) expectedItem == '>') {
                         expectedLtr = true;
                     } else if (expectedItem instanceof Number) {
-                        colorChangeExpected = true;
                         expectedColor = ((Number) expectedItem).floatValue();
                     } else if (expectedItem instanceof TestFont) {
-                        fontChangeExpected = true;
                         expectedFont = (TestFont) expectedItem;
                     } else if (expectedItem instanceof String) {
                         assertEquals(expectedItem, regionText, "Bad text @ "+(i-1));
@@ -130,23 +125,27 @@ public class TextLayoutIteratorTests {
                 throw new IllegalArgumentException("Invalid test data: found no string for '"+regionText+"'");
             }
 
+            assertEquals(textIndex, run.start, "For "+regionText);
+            textIndex = run.end;
 
-            assertEquals(regionText.endsWith("\t"), (flags & LayoutTextIterator.FLAG_TAB_STOP) != 0, "For "+regionText);
-            assertEquals(regionText.endsWith("\n"), (flags & LayoutTextIterator.FLAG_LINE_BREAK) != 0, "For "+regionText);
+            assertEquals(regionText.equals("\t"), (flags & TextRun.FLAG_TAB_STOP) != 0, "For "+regionText);
+            assertEquals(regionText.equals("\n")
+                    || regionText.equals("\r")
+                    || regionText.equals("\r\n"), (flags & TextRun.FLAG_LINE_BREAK) != 0, "For "+regionText);
 
-            assertEquals(colorChangeExpected && !firstRegion, (flags & LayoutTextIterator.FLAG_COLOR_CHANGE) != 0, "For "+regionText);
-            assertEquals(fontChangeExpected && !firstRegion, (flags & LayoutTextIterator.FLAG_FONT_CHANGE) != 0, "For "+regionText);
-
-            assertEquals(expectedFont, iterator.currentFont, "For "+regionText);
-            assertEquals(expectedColor, iterator.currentColor, "For "+regionText);
-            assertEquals(expectedLtr, iterator.currentLtr, "For "+regionText);
+            assertEquals(expectedFont, run.font, "For "+regionText);
+            assertEquals(expectedColor, run.color, "For "+regionText);
+            assertEquals(expectedLtr, run.isLtr(), "For "+regionText);
 
             assertFalse(lastRegion, "For "+regionText);
-            lastRegion = (flags & LayoutTextIterator.FLAG_LAST_REGION) != 0;
+            lastRegion = (flags & TextRun.FLAG_LAST_RUN) != 0;
 
             firstRegion = false;
+
         }
         assertTrue(lastRegion || firstRegion, "Last run not set");
+        assertEquals(textIndex, text.length);
+        LayoutTextRunIterable.free(runIterable);
 
         if (i != expected.length) {
             fail("Done, but expected "+(expected.length - i)+" more item(s)");
@@ -157,10 +156,15 @@ public class TextLayoutIteratorTests {
     public void simpleTest() {
         testBlocks("");
         testBlocks("hello", "hello");
-        testBlocks("hello\tworld", "hello\t", "world");
-        testBlocks("hello\nworld", "hello\n", "world");
-        testBlocks("a\nb\tc\nd\t", "a\n", "b\t", "c\n", "d\t");
+        testBlocks("hello\tworld", "hello", "\t", "world");
+        testBlocks("hello\nworld", "hello", "\n", "world");
+        testBlocks("hello\rworld", "hello", "\r", "world");
+        testBlocks("hello\r\nworld", "hello", "\r\n", "world");
+        testBlocks("a\nb\tc\nd\t", "a", "\n", "b", "\t", "c", "\n", "d", "\t");
+        testBlocks("a\nb\tc\r\nd\t", "a", "\n", "b", "\t", "c", "\r\n", "d", "\t");
         testBlocks("\n\t\n\t", "\n", "\t", "\n", "\t");
+        testBlocks("\r\n\t\n\t", "\r\n", "\t", "\n", "\t");
+        testBlocks("\r\n\t\r\n\t", "\r\n", "\t", "\r\n", "\t");
     }
 
     @Test
@@ -170,7 +174,7 @@ public class TextLayoutIteratorTests {
         testBlocks("B1hello", FONT_BOLD, 1, "hello");
         testBlocks("helloB1world", "hello", FONT_BOLD, 1, "world");
         testBlocks("aBb1cR2d", "a", FONT_BOLD, "b", 1, "c", FONT, 2, "d");
-        testBlocks("a\tBb\n1cR2d", "a\t", FONT_BOLD, "b\n", 1, "c", FONT, 2, "d");
+        testBlocks("a\tBb\n1cR2d", "a", "\t", FONT_BOLD, "b", "\n", 1, "c", FONT, 2, "d");
     }
 
     private static final String HEBREW = "טֶקסט";// Because editing RTL is pain
@@ -181,7 +185,7 @@ public class TextLayoutIteratorTests {
         testBlocks("foo "+HEBREW+" bar", "foo ", '<', HEBREW, '>', " bar");
     }
 
-    public static final class TestFont implements Font {
+    public static final class TestFont implements Font<TestFont> {
 
         public final String name;
 
@@ -201,6 +205,16 @@ public class TextLayoutIteratorTests {
 
         @Override
         public void prepareGlyphs() {}
+
+        @Override
+        public TestFont getFallback() {
+            return null;
+        }
+
+        @Override
+        public GlyphLayout<TestFont> createGlyphLayout() {
+            return null;
+        }
 
         @Override
         public void dispose() {}

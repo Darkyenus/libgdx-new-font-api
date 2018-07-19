@@ -30,6 +30,7 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import java.io.File;
 import java.text.Bidi;
 import java.text.BreakIterator;
+import java.util.Arrays;
 
 import static com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT;
 import static com.badlogic.gdx.graphics.text.harfbuzz.HarfBuzz.*;
@@ -157,11 +158,11 @@ public class HarfBuzzTest {
                 cache = new FontRenderCache();
 
                 font = BitmapFontSystem.INSTANCE.createFont(
-                        Gdx.files.local("test-fonts/some-time-later/some-time-later-regular64.fnt"), 2f);
+                        Gdx.files.local("test-fonts/some-time-later/some-time-later-regular64.fnt"), 2f, null);
                 fontBold = BitmapFontSystem.INSTANCE.createFont(
-                        Gdx.files.local("test-fonts/some-time-later/some-time-later-bold64.fnt"), 2f);
+                        Gdx.files.local("test-fonts/some-time-later/some-time-later-bold64.fnt"), 2f, null);
                 fontItalic = BitmapFontSystem.INSTANCE.createFont(
-                        Gdx.files.local("test-fonts/some-time-later/some-time-later-italic64.fnt"), 2f);
+                        Gdx.files.local("test-fonts/some-time-later/some-time-later-italic64.fnt"), 2f, null);
 
                 layout = BitmapFontSystem.INSTANCE.createGlyphLayout();
 
@@ -312,9 +313,18 @@ public class HarfBuzzTest {
         }
     }
 
+    public static void bidiAssumptionsTest() {
+        final byte[] levels = {-1, 3, 3, 3, -1};
+        final String[] things = {"A", "B", "C", "D", "E"};
+        Bidi.reorderVisually(levels, 0, things, 0, levels.length);
+
+        System.out.println(Arrays.toString(things));
+    }
+
     public static void main(String[] args) {
-        applicationTest();
+        //applicationTest();
         //bidiTest();
         //lineBreakTest();
+        bidiAssumptionsTest();
     }
 }

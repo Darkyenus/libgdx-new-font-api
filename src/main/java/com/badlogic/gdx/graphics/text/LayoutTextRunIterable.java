@@ -18,8 +18,6 @@ import java.util.Iterator;
  */
 public final class LayoutTextRunIterable<F extends Font> implements Iterable<LayoutTextRunIterable.TextRun<F>>, Pool.Poolable {
 
-    private static ByteArray bidiEvalLevelCache = null;
-
     private final Array<TextRun<F>> textRuns = new Array<>(true, 10, TextRun.class);
 
     /**Obtain iterable of runs in given text.
@@ -39,10 +37,61 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
     }
 
     /**
-     * Add {@link TextRun}s, which are in text in area from start to end, to {@link #textRuns}.
-     * @param ltr if the runs should be marked ltr or rtl
+     * Add special tab stop or linebreak run.
+     * This run contains only the tab stop or linebreak, no other characters.
+     * Length of the break run is variable, typically 1, but may be more (e.g. CRLF).
+     * @param start index of first character of run
+     * @param maxEnd run may not end further than this
+     * @param level of the run
+     * @return length of the run, typically 1 or 2
      */
-    private void addRuns(final LayoutText<F> text, final int start, final int end, final boolean ltr) {
+    private int addBreakRun(final LayoutText<F> text, final int start, final int maxEnd, final byte level) {
+        assert start < maxEnd;
+
+        @SuppressWarnings("unchecked")
+        final TextRun<F> run = RUN_POOL.obtain();
+        run.start = start;
+        run.end = start + 1;
+        run.level = level;
+
+        // Find some font and color to use, but don't update it. Only one or max 2 characters are expected
+        // and neither will probably draw.
+        int region = text.regionAt(start);
+        if (region < 0) {
+            run.font = text.initialFont;
+            run.color = text.initialColor;
+        } else {
+            run.font = text.regionFonts.get(region);
+            run.color = text.regionColors.items[region];
+        }
+
+        final char[] chars = text.text;
+        switch (chars[start]) {
+            case '\t':
+                run.flags |= TextRun.FLAG_TAB_STOP;
+                break;
+            case '\r':
+                if (start + 1 < maxEnd && chars[start + 1] == '\n') {
+                    run.end++;
+                }
+                // Fallthrough
+            case '\n':
+                run.flags |= TextRun.FLAG_LINE_BREAK;
+                break;
+            default:
+                assert false;
+        }
+
+        textRuns.add(run);
+
+        return run.end - run.start;
+    }
+
+    /**
+     * Add {@link TextRun}s, which are in text in area from start to end, to {@link #textRuns}.
+     * @param level Bidi level of the area
+     */
+    private void addRuns(final LayoutText<F> text, final int start, final int end, final byte level) {
         assert start < end;
         final Array<TextRun<F>> textRuns = this.textRuns;
 
@@ -67,13 +116,12 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
             run.start = index;
             run.color = color;
             run.font = font;
-            if (ltr) {
-                run.flags |= TextRun.FLAG_LTR;
-            }
+            run.level = level;
 
             // Compute new end
             F nextFont = null;
             float nextColor = 0f;
+            int nextRegionEndIndex = -1;
             if (regionEndIndex < end) {
                 // If following regions share same font and color, no need to stop here
                 // and even if they do, advance into them
@@ -82,26 +130,18 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
                     assert region < text.regionStarts.size; // Because regionEndIndex < end
                     nextFont = text.regionFonts.get(region);
                     nextColor = text.regionColors.items[region];
-                    regionEndIndex = regionEndIndex(text, region);
+                    nextRegionEndIndex = regionEndIndex(text, region);
 
                     if (font != nextFont || color != nextColor) {
                         break;
                     }
+                    regionEndIndex = nextRegionEndIndex;
                 } while (regionEndIndex < end);
             }
 
-            // Compute new final end index and check whether this run is \n or \t run.
+            // Compute new final end index
             final int endIndex = Math.min(regionEndIndex, end);
             assert endIndex > index;
-            switch (text.text[endIndex - 1]) {
-                case '\n':
-                    run.flags |= TextRun.FLAG_LINE_BREAK;
-                    break;
-                case '\t':
-                    run.flags |= TextRun.FLAG_TAB_STOP;
-                    break;
-            }
-
             run.end = index = endIndex;
             textRuns.add(run);
 
@@ -109,6 +149,7 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
                 assert nextFont != null;
                 font = nextFont;
                 color = nextColor;
+                regionEndIndex = nextRegionEndIndex;
             } else {
                 break;
             }
@@ -166,64 +207,52 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
         final Array<TextRun<F>> textRuns = this.textRuns;
         if (usedBidi == null) {
             // Simple variant
+            final byte level = (byte) (allLtr ? 0 : 1);
             int index = 0;
-            do {
-                final int endIndex = runBreakIndex(chars, index, length);
-                final int reorderStart = textRuns.size;
-                addRuns(text, index, endIndex, allLtr);
-                if (!allLtr) {
-                    // Reverse items on part TODO THIS MAY MESS UP TAB STOPS in RTL
-                    reverse(textRuns.items, reorderStart, textRuns.size);
+            while (true) {
+                final int endIndex = findBreakIndex(chars, index, length);
+                if (index != endIndex) {
+                    assert index < endIndex;
+                    addRuns(text, index, endIndex, level);
+                    index = endIndex;
                 }
-                index = endIndex;
-            } while (index < length);
+
+                if (endIndex < length) {
+                    index += addBreakRun(text, endIndex, length, level);
+                } else {
+                    break;
+                }
+            }
         } else {
             // Full bidi variant
-            ByteArray levels = LayoutTextRunIterable.bidiEvalLevelCache;
             final int runCount = usedBidi.getRunCount();
-            if (levels == null) {
-                levels = LayoutTextRunIterable.bidiEvalLevelCache = new ByteArray(true, runCount);
-            } else {
-                levels.clear();
-            }
-            levels.ensureCapacity(runCount);
 
             int index = 0;
             int runIndex = 0;
-            int lineEnd = runBreakIndex(chars, index, length);
+            int breakEnd = findBreakIndex(chars, index, length);
             int runEnd = usedBidi.getRunLimit(runIndex);
-            int reorderLineFrom = 0;
 
+            byte runLevel = (byte) usedBidi.getRunLevel(runIndex);
             while (true) {
-                final int runLevel = usedBidi.getRunLevel(runIndex);
-                final int runCountBefore = textRuns.size;
-                final int endIndex = Math.min(lineEnd, runEnd);
-                addRuns(text, index, endIndex, (runLevel & 1) == 0);
-                for (int i = runCountBefore; i < textRuns.size; i++) {
-                    levels.add((byte) runLevel);
-                }
-                index = endIndex;
-
-                if (endIndex == lineEnd) {
-                    // Reorder line TODO: Should this be done after fit-wrapping? Probably not, as it seems too hard, but spec seems to be unclear.
-                    //TODO THIS MAY MESS UP TAB STOPS in RTL
-                    Bidi.reorderVisually(levels.items, 0, textRuns.items, reorderLineFrom, levels.size);
-                    levels.clear();
-
-                    reorderLineFrom = textRuns.size;
-                    lineEnd = runBreakIndex(chars, lineEnd, length);
+                final int endIndex = Math.min(breakEnd, runEnd);
+                if (index != endIndex) {
+                    addRuns(text, index, endIndex, runLevel);
+                    index = endIndex;
                 }
 
                 if (endIndex == runEnd) {
+                    // If breakEnd is also here, it will get invoked on next iteration
                     runIndex++;
                     if (runIndex >= runCount) {
                         break;
                     }
                     runEnd = usedBidi.getRunLimit(runIndex);
+                    runLevel = (byte) usedBidi.getRunLevel(runIndex);
+                } else {
+                    index += addBreakRun(text, index, runEnd, runLevel);
+                    breakEnd = findBreakIndex(chars, index, length);
                 }
             }
-
-            assert reorderLineFrom == textRuns.size; // All should be reordered correctly
         }
 
         if (textRuns.size > 0) {
@@ -250,26 +279,22 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
         return true;
     }
 
-    private static int runBreakIndex(char[] text, int from, int end) {
+    private static int findBreakIndex(char[] text, int from, int end) {
         for (int i = from; i < end; i++) {
             switch (text[i]) {
                 case '\n':
+                case '\r':
                 case '\t':
-                    return i + 1;
+                    return i;
             }
         }
         return end;
     }
 
-    private static <T> void reverse(T[] items, int start, int end) {
-        for (int first = start, last = end - 1; first < last; first++, last--) {
-            T temp = items[first];
-            items[first] = items[last];
-            items[last] = temp;
-        }
-    }
-
     /**
+     * All characters in input text are represented in exactly one {@link TextRun},
+     * in the order in which they appear in the text.
+     *
      * Do not remove or modify iterated elements.
      */
     @Override
@@ -291,14 +316,12 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
      * Continuous range of characters in original text with the same properties.
      */
     public static final class TextRun<F extends Font> implements Pool.Poolable {
-        /** This run's glyphs should be laid out left to right, opposed to right to left. */
-        public static final int FLAG_LTR = 1;
-        /** Next run will be on a new line, relative to this run. (Current run ends with \n) */
-        public static final int FLAG_LINE_BREAK = 1<<1;
-        /** Next run should be aligned according to a tab stop. (Current run ends with \t) */
-        public static final int FLAG_TAB_STOP = 1<<2;
+        /** This run consists solely of a linebreak sequence. Next run will be on a new line, relative to this run. (Current run is \n, \r, or \r\n) */
+        public static final int FLAG_LINE_BREAK = 1;
+        /** This run consists solely of a tab stop. (Current run is \t) */
+        public static final int FLAG_TAB_STOP = 1<<1;
         /** Set on the last run of the iterable. Users may want to do end of line cleanup based on this. */
-        public static final int FLAG_LAST_RUN = 1<<3;
+        public static final int FLAG_LAST_RUN = 1<<2;
 
         /** Positions into the original text. Never 0-length. */
         public int start, end;
@@ -307,7 +330,13 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
         /** Color used in this run */
         public float color;
         /** If false, text should be laid out left-to-right. */
-        public int flags;
+        public byte flags;
+        /** Bidi level of the run. */
+        public byte level;
+
+        public boolean isLtr() {
+            return (level & 1) == 0;
+        }
 
         @Override
         public void reset() {

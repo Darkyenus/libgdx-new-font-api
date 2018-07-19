@@ -1,7 +1,6 @@
 package com.badlogic.gdx.graphics.text;
 
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Disposable;
 
 /**
@@ -9,7 +8,7 @@ import com.badlogic.gdx.utils.Disposable;
  *
  * This font is immutable and may never change properties after construction (or initialization).
  */
-public interface Font extends Disposable {
+public interface Font <SelfFont extends Font<SelfFont>> extends Disposable {
 
     int MISSING_GLYPH_ID = 0;
 
@@ -31,7 +30,7 @@ public interface Font extends Disposable {
      *
      * After calling this, possibly multiple times, call {@link #prepareGlyphs()} to ensure that returned glyphs
      * contain valid references to texture page regions from {@link #getPages()}.
-     * Until then, regions may be empty or pages may be missing completely.
+     * Until then, regions may be empty or pages may be missing completely. (Not needed if all this returned was null.)
      *
      * glyphId 0 ({@link #MISSING_GLYPH_ID}) should always represent "missing glyph", if not null.
      * When requested glyph is missing, return null, it is a caller responsibility to find replacement glyph (possibly 0).
@@ -46,4 +45,19 @@ public interface Font extends Disposable {
      * and reference valid texture areas.
      */
     void prepareGlyphs();
+
+    /**
+     * Get font that should be used when some character is not found in this font.
+     * This may form an arbitrarily long chain, but must never cycle.
+     * @return fallback font, or null if no such font exists
+     */
+    SelfFont getFallback();
+
+    /**
+     * Create glyph layout for this class of fonts.
+     * This is a shortcut, and must be strictly equivalent, to calling {@link FontSystem#createGlyphLayout()} on the
+     * font system which created this font.
+     * @return glyph layout for this type of fonts, never null
+     */
+    GlyphLayout<SelfFont> createGlyphLayout();
 }

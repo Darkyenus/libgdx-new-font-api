@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.text.Font;
 import com.badlogic.gdx.graphics.text.Glyph;
+import com.badlogic.gdx.graphics.text.GlyphLayout;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.GdxRuntimeException;
 import com.badlogic.gdx.utils.LongArray;
@@ -21,9 +22,10 @@ import java.util.regex.Pattern;
  * Simple 1:1 char-glyph font loaded from
  * <a href="http://www.angelcode.com/products/bmfont/doc/file_format.html">textual .fnt file</a>.
  */
-public class BitmapFont implements Font {
+public class BitmapFont implements Font<BitmapFont> {
 
     private final String name;
+    private final BitmapFont fallback;
 
     static private final byte STATE_INITIAL = 0;
     static private final byte STATE_GLYPHS_LOADED = 1;
@@ -55,8 +57,13 @@ public class BitmapFont implements Font {
 
     private static final long MASK_21BITS = 0x1F_FFFFL;
 
-    public BitmapFont(String name) {
+    /**
+     * @param name of the font, for debug
+     * @param fallback font, or null
+     */
+    public BitmapFont(String name, BitmapFont fallback) {
         this.name = name;
+        this.fallback = fallback;
     }
 
     private long packKerning(int first, int second, int clampedKerning) {
@@ -398,6 +405,16 @@ public class BitmapFont implements Font {
     @Override
     public void prepareGlyphs() {
         // no-op, all glyphs are already preloaded
+    }
+
+    @Override
+    public BitmapFont getFallback() {
+        return fallback;
+    }
+
+    @Override
+    public GlyphLayout<BitmapFont> createGlyphLayout() {
+        return BitmapFontSystem.INSTANCE.createGlyphLayout();
     }
 
     @Override

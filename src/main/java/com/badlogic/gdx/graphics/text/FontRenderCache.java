@@ -120,6 +120,7 @@ public class FontRenderCache {
                 pageVertices = preparePageMappingForFont(font);
             }
 
+            //TODO Reverse mirrored glyphs on mirrored runs (but how to detect mirrored characters?) (https://www.compart.com/en/unicode/mirrored)
             final int glyphAmount = run.glyphs.size;
             final Glyph[] glyphs = run.glyphs.items;
             final float[] glyphX = run.glyphX.items;

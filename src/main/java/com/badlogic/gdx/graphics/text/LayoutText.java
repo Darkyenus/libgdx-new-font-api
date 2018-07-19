@@ -187,8 +187,9 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
 
     /**
      * Find index of tab stop which belongs to the text found at given x.
-     * Returns valid index for {@link #tabStopOffsetFor}.
-     * @return index or -1 if overflows to next line on which 0 should be used
+     * Returns valid index for {@link #tabStopOffsetFor}, or -1 when there are no more tab stops on this line.
+     * In that case, it can either overflow to next line and tab stop of 0 should be used (complex behavior),
+     * or it can ignore the tab stop completely.
      */
     public int tabStopIndexFor(float x, float defaultTabAdvance) {
         final float[] tabPoints = this.tabPoints;
@@ -244,6 +245,10 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
             return i;
         }
         return -i - 2;
+    }
+
+    public boolean isLeftToRight() {
+        return leftToRight;
     }
 
     /**

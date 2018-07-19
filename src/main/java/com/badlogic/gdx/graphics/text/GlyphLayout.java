@@ -147,14 +147,14 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
         final float height = -y - (line == 0 ? 0 : lineHeights.items[line-1]);
 
         if (index < run.charactersStart) {
-            if (run.charactersLtr) {
+            if (run.isLtr()) {
                 return caret.set(run.x, y, 0f, height);
             } else {
                 return caret.set(run.x + run.width, y, 0f, height);
             }
         } else if (index >= run.charactersEnd) {
             // Assuming that this is the last run, because we wouldn't be at the end if it wasn't
-            if (run.charactersLinebreak) {
+            if ((run.charactersFlags & GlyphRun.FLAG_LINEBREAK) != 0) {
                 assert line + 1 <= lineHeights.size;
                 final float nY = -lineHeights.items[line+1];
                 final float nHeight = -nY - lineHeights.items[line];
@@ -162,7 +162,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
                 return caret.set(0f, nY, 0f, nHeight);
             }
 
-            if (run.charactersLtr) {
+            if (run.isLtr()) {
                 return caret.set(run.x + run.width, y, 0f, height);
             } else {
                 return caret.set(run.x, y, 0f, height);
@@ -271,7 +271,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
         float leftX = 0f;
         int rightIndex = characterPositionCount;
         float rightX = lastRun.width;
-        if (lastRun.charactersLtr) {
+        if (lastRun.isLtr()) {
             for (int i = 0; i < characterPositionCount; i++) {
                 final float pos = characterPositions[i];
                 if (Float.isNaN(pos)) {
@@ -302,7 +302,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
         }
 
         int index = lastRun.charactersStart + (x - leftX < rightX - x ? leftIndex : rightIndex);
-        if (index == lastRun.charactersEnd && lastRun.charactersLinebreak
+        if (index == lastRun.charactersEnd && (lastRun.charactersFlags & GlyphRun.FLAG_LINEBREAK) != 0
                 && lastRun.charactersEnd - 1 >= lastRun.charactersStart) {
             // Return position before the linebreak
             index--;

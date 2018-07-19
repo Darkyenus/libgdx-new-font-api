@@ -33,6 +33,16 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
 
     private static final int DEFAULT_SIZE = 32;
 
+    /** Set if this run is a linebreak. Used when positioning caret. */
+    public static final byte FLAG_LINEBREAK = 1;
+    /** Set if this run is a tab stop specified by {@link LayoutText#TAB_STOP_LEFT}. Has special behavior when wrapping. */
+    public static final byte FLAG_TAB_LEFT = 1<<1;
+    /** Set if this run is a tab stop specified by {@link LayoutText#TAB_STOP_CENTER}. Has special behavior when wrapping. */
+    public static final byte FLAG_TAB_CENTER = 1<<2;
+    /** Set if this run is a tab stop specified by {@link LayoutText#TAB_STOP_RIGHT}. Has special behavior when wrapping. */
+    public static final byte FLAG_TAB_RIGHT = 1<<3;
+    public static final byte FLAG_MASK_TAB = FLAG_TAB_LEFT | FLAG_TAB_CENTER | FLAG_TAB_RIGHT;
+
     private GlyphRun() {
     }
 
@@ -56,8 +66,6 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
 
     /** Range of the original text, which is drawn in this run. [start, end) */
     public int charactersStart, charactersEnd;
-    /** True if the characters are laid out left-to-right, false if right-to-left.*/
-    public boolean charactersLtr;
     /** For each character in [{@link #charactersStart}, {@link #charactersEnd})
      * contains X coordinate of the <i>beginning</i> of the character. That is the left edge of glyph for left-to-right
      * and right edge of glyph for right-to-left.
@@ -73,11 +81,14 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
      * <i>beginning</i> coordinate of next cluster should be used. If there is no such cluster, use position of the next
      * run (which may be on a new line - when drawing such selection, feel free to use {@link #width}).
      * If there is no next run, use {@link #width}, unless the last character of this run is <code>\n</code>
-     * (which is signified by {@link #charactersLinebreak}), in which case beginning of next line should be used.*/
+     * (which is signified by {@link GlyphRun#FLAG_LINEBREAK}), in which case beginning of next line should be used.*/
     public final FloatArray characterPositions = new FloatArray(true, DEFAULT_SIZE);
-    /** True if this run ends with a linebreak. Used when positioning caret. */
-    public boolean charactersLinebreak;
-
+    /** Content related flags.
+     * @see GlyphRun#FLAG_LINEBREAK
+     * @see GlyphRun#FLAG_TAB_LEFT and friends */
+    public byte charactersFlags;
+    /** Bidi level of this run. */
+    public byte charactersLevel;
 
     /**
      * @return width of the run, extended by draw bounds of last glyph, if those protrude {@link #width}
@@ -91,6 +102,10 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
         return this.width;
     }
 
+    public boolean isLtr() {
+        return (charactersLevel & 1) == 0;
+    }
+
     public void ensureGlyphCapacity(int capacity) {
         glyphs.ensureCapacity(capacity);
         glyphX.ensureCapacity(capacity);
@@ -102,8 +117,7 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
         line = 0;
         width = 0;
         charactersStart = charactersEnd = -1;
-        charactersLtr = true;
-        charactersLinebreak = false;
+        charactersFlags = 0;
 
         glyphs.clear();
         glyphX.clear();
