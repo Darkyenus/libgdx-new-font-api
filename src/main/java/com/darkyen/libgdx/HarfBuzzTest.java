@@ -18,7 +18,6 @@ import com.badlogic.gdx.graphics.text.bitmap.BitmapFont;
 import com.badlogic.gdx.graphics.text.bitmap.BitmapFontSystem;
 import com.badlogic.gdx.graphics.text.bitmap.BitmapGlyphLayout;
 import com.badlogic.gdx.graphics.text.harfbuzz.HarfBuzz;
-import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Align;
@@ -31,7 +30,6 @@ import java.io.File;
 import java.text.Bidi;
 import java.text.BreakIterator;
 import java.util.Arrays;
-import java.util.concurrent.TimeUnit;
 
 import static com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT;
 import static com.badlogic.gdx.graphics.text.harfbuzz.HarfBuzz.*;
@@ -41,6 +39,7 @@ import static com.badlogic.gdx.graphics.text.harfbuzz.HarfBuzz.Font.hb_shape_lis
 /**
  *
  */
+@SuppressWarnings("unused")
 public class HarfBuzzTest {
 
     private static void lowLevelTest() {
@@ -153,6 +152,8 @@ public class HarfBuzzTest {
 
             final Vector2 mouse = new Vector2();
 
+            int caretIndex = 0;
+
             @Override
             public void create() {
                 batch = new SpriteBatch();
@@ -199,16 +200,17 @@ public class HarfBuzzTest {
                         "Mauris placerat varius felis, in porta nunc interdum vel. Etiam ornare aliquet massa et volutpat. Mauris cursus turpis at sollicitudin finibus. In malesuada auctor tellus, at hendrerit lacus tempus in. Nulla vitae metus nulla. Donec tristique aliquet libero. Nulla vitae dolor lacinia, convallis augue quis, suscipit elit. In hac habitasse platea dictumst.\n" +
                         "\n" +
                         "Nunc in nunc lorem. Fusce eu elit at sapien dignissim accumsan eget et lacus. Sed id ipsum sapien. Morbi et semper neque. Aliquam pharetra odio id faucibus commodo. Nunc sagittis risus sit amet elit sagittis consequat. Praesent dictum mollis velit id mattis. Proin maximus ex gravida risus tincidunt feugiat. Proin hendrerit gravida justo et placerat. Duis faucibus lacus vitae mi luctus, a molestie urna tristique. Nulla dictum nisl quis justo viverra, eget tincidunt massa porttitor. Duis non purus vel nibh lacinia volutpat. Nullam quis congue diam. Nam egestas gravida cursus. Nam malesuada.");
+                caretIndex = sb.length;
 
                 Gdx.input.setInputProcessor(new InputAdapter() {
                     @Override
                     public boolean keyTyped(char character) {
                         if (character == 8) {
-                            if (sb.length > 0) {
-                                sb.length--;
+                            if (caretIndex > 0) {
+                                sb.deleteCharAt(--caretIndex);
                             }
                         } else {
-                            sb.append(character);
+                            sb.insert(caretIndex++, character);
                         }
                         return true;
                     }
@@ -276,14 +278,10 @@ public class HarfBuzzTest {
                 cache.draw(batch);
 
                 //Caret
-                final Rectangle caretRect;
-                if (Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT)) {
-                    final int caretIndex = (int) ((System.currentTimeMillis() / 700) % (text.length() + 1));
-                    caretRect = layout.getCaretPosition(caretIndex);
-                } else {
-                    final int index = layout.getIndexAt(mouse.x - textX, mouse.y  - textY, true);
-                    caretRect = layout.getCaretPosition(index);
+                if (Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
+                    caretIndex = layout.getIndexAt(mouse.x - textX, mouse.y  - textY, true);
                 }
+                final Rectangle caretRect = layout.getCaretPosition(caretIndex);
                 if (caretRect != null) {
                     caretRect.width = 1f;
                     batch.setColor(0f, 0f, 0f, 1f);
