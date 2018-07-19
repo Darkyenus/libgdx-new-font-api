@@ -135,7 +135,7 @@ public class TextLayoutIteratorTests {
 
             assertEquals(expectedFont, run.font, "For "+regionText);
             assertEquals(expectedColor, run.color, "For "+regionText);
-            assertEquals(expectedLtr, run.isLtr(), "For "+regionText);
+            assertEquals(expectedLtr, TextRun.isLevelLtr(run.level), "For "+regionText);
 
             assertFalse(lastRegion, "For "+regionText);
             lastRegion = (flags & TextRun.FLAG_LAST_RUN) != 0;

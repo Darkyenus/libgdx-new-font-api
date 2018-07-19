@@ -41,7 +41,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
      * @param horizontalAlign one of horizontal alignments from {@link com.badlogic.gdx.utils.Align}
      * @param elipsis to use when the text is too long and doesn't fit available space. Will be rendered using
      *                the {@link LayoutText#initialFont} and {@link LayoutText#initialColor} of the text.
-     *                May be null, in which case default value is used, if needed. */
+     *                May be null, in which case no ellipsis is used. */
     public abstract void layoutText(LayoutText<Font> text, float availableWidth, float availableHeight, int horizontalAlign, String elipsis);
 
     protected final void buildCharPositions() {

@@ -31,6 +31,7 @@ import java.io.File;
 import java.text.Bidi;
 import java.text.BreakIterator;
 import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
 
 import static com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT;
 import static com.badlogic.gdx.graphics.text.harfbuzz.HarfBuzz.*;
@@ -218,7 +219,7 @@ public class HarfBuzzTest {
                 Gdx.gl.glClear(GL_COLOR_BUFFER_BIT);
 
                 text.init(sb.chars, sb.length, font, Color.ROYAL.toFloatBits(), null, null, true);
-                text.addRegion(5, fontItalic, Color.BLUE.toFloatBits());
+                //text.addRegion(5, fontItalic, Color.BLUE.toFloatBits());
                 /*for (int i = 18; i < 24; i++) {
                     if (MathUtils.randomBoolean()) {
                         text.addRegion(i, font, Color.toFloatBits(MathUtils.random(), MathUtils.random(), MathUtils.random(), 1f));
@@ -226,12 +227,20 @@ public class HarfBuzzTest {
                 }
                 text.addRegion(24, fontBig, Color.RED.toFloatBits());
                 text.addRegion(40, fontSponge, Color.BLACK.toFloatBits());*/
-                text.addRegion(15, fontBold, Color.BLACK.toFloatBits());
-                text.addRegion(25, font, Color.BLACK.toFloatBits());
+                //text.addRegion(15, fontBold, Color.BLACK.toFloatBits());
+                //text.addRegion(25, font, Color.BLACK.toFloatBits());
 
 
                 layout.clear();
-                layout.layoutText(text, Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Align.left, null);
+                final long layoutStart = System.nanoTime();
+                for (int i = 0; i < 100; i++) {
+                    layout.layoutText(text, 300f, Float.POSITIVE_INFINITY, Align.left, null);
+                }
+                final long duration = TimeUnit.NANOSECONDS.toMillis((System.nanoTime() - layoutStart) / 100);
+                if (Gdx.input.isKeyPressed(Input.Keys.F1)) {
+                    System.out.println(duration+" ms");
+                }
+
                 final float textX = Gdx.graphics.getWidth()/2f - layout.width()/2f;
                 final float textY = Gdx.graphics.getHeight()/2f + layout.height()/2f;
                 cache.addGlyphs(layout, textX, textY);
@@ -282,8 +291,6 @@ public class HarfBuzzTest {
         final String text = hebrew1+"(C+\n+)"+hebrew2;
         final Bidi bidi = new Bidi(text, Bidi.DIRECTION_DEFAULT_LEFT_TO_RIGHT);
 
-
-
         System.out.println("Mixed: "+bidi.isMixed());
         System.out.println("LTR: "+bidi.isLeftToRight());
         System.out.println("RTL: "+bidi.isRightToLeft());
@@ -322,9 +329,9 @@ public class HarfBuzzTest {
     }
 
     public static void main(String[] args) {
-        //applicationTest();
+        applicationTest();
         //bidiTest();
         //lineBreakTest();
-        bidiAssumptionsTest();
+        //bidiAssumptionsTest();
     }
 }

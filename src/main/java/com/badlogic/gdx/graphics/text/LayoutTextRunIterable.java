@@ -334,7 +334,7 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
         /** Bidi level of the run. */
         public byte level;
 
-        public boolean isLtr() {
+        public static boolean isLevelLtr(byte level) {
             return (level & 1) == 0;
         }
 
