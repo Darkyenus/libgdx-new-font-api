@@ -176,7 +176,8 @@ public class HarfBuzzTest {
                 white = new Texture(pixmap);
 
 
-                //sb.append("Hello world, WHY,\nVAVAW % Ø");
+                sb.append("Hello world, WHY,\nVAVAW % Ø");
+                if (false)
                 sb.append("Curabitur vel magna dui. Curabitur ac enim cursus, congue sapien in, tempor massa. Donec vitae tristique magna. Fusce dignissim nisl ut hendrerit vulputate. Aliquam quis magna molestie, feugiat neque sed, commodo justo. Pellentesque in posuere elit. Nullam vitae blandit ligula. Integer malesuada ornare urna, vitae fringilla metus fringilla sed. Vestibulum at leo risus. Morbi vehicula sodales arcu vel gravida. Aenean tempor ipsum non tincidunt vehicula. Etiam tincidunt leo ante, quis iaculis libero luctus non.\n" +
                         "\n" +
                         "Aliquam porttitor sed enim at viverra. Proin quis egestas neque. Sed lectus enim, tempor et sapien vel, varius molestie elit. Aliquam luctus ante in efficitur auctor. Integer et erat pharetra, ultricies nisl ut, bibendum mi. Integer molestie felis eu aliquet maximus. Vestibulum tristique efficitur turpis in ornare. Etiam pretium tincidunt sapien, sit amet facilisis nulla lacinia sed.\n" +
@@ -243,7 +244,7 @@ public class HarfBuzzTest {
                 Gdx.gl.glClearColor(0.8f, 0.8f, 0.8f, 1f);
                 Gdx.gl.glClear(GL_COLOR_BUFFER_BIT);
 
-                text.init(sb.chars, sb.length, font, Color.ROYAL.toFloatBits(), null, null, true);
+                text.init(sb.chars, sb.length, font, Color.ROYAL.toFloatBits(), null, true);
                 //text.addRegion(5, fontItalic, Color.BLUE.toFloatBits());
                 /*for (int i = 18; i < 24; i++) {
                     if (MathUtils.randomBoolean()) {

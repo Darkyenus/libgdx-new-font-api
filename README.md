@@ -103,17 +103,21 @@ and ellipsis truncation.
 - BitmapFontSystem
 	- Loading
 	- Multiple font & color shaping
+	- Line wrapping
+	- Tab stops
 - HarfBuzz bindings
+- Text editing introspection
+	- "where should caret go when it is at this index?"
+	- "what character did I press when I clicked here?"
+	- "how it should move when I press LEFT/RIGHT/UP/DOWN arrow? And which characters to delete on DELETE or BACKSPACE?"
 
 ### ToDo
 - BitmapFontSystem
-	- Line wrapping
-	- Tab stops
+	- Vertical line wrapping
+	- Ellipsis
+	- Tab stops in RTL (no idea what happens there)
+	- Optimize for heavily wrapped text
 - Text editing introspection
-	- "where should caret go when it is at this index?"
-	- "how it should move when I press LEFT/RIGHT/UP/DOWN arrow?"
-	- "what character did I press when I clicked here?"
-	- "what should backspace delete?"
 	- "how should I render selection?"
 - Markup to `LayoutText` converter
 - API shortcuts for everyday use, where not all features are needed

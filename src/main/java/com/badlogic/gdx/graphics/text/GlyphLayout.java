@@ -197,13 +197,63 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
     }
 
     /**
-     * Returns range of <code>chars</code> that should be deleted from given codepoint.
-     * @param index of the caret
-     * @param forward true = DELETE, false = BACKSPACE
+     * Return character index, in which the caret should end up after moving <code>offset</code> spaced to the right
+     * (or left, if negative). Only normalizes the index if offset if 0. Returns the closest possible index when
+     * the result would be out of laid out text.
+     * May be also used when determining which characters to delete as single unit.
+     * @param characterIndex index into the char array of the original text
+     * @param offset "how many times did user press right arrow to move caret?" (can be negative)
      */
-    public final void getDeletionRange(int index, boolean forward) {
-        //TODO This maybe should get implemented elsewhere? But we already have to deal with it, so we may as well expose it...
-        //TODO implement and figure out return type
+    public final int getIndexAfterEditOffset(int characterIndex, int offset) {
+        //TODO Test this
+        Array<GlyphRun<Font>> runs = this.runs;
+        if (runs.size == 0) {
+            return 0;
+        }
+
+        int runIndex = indexOfRunOf(characterIndex, true);
+        GlyphRun<Font> run = runs.items[runIndex];
+        if (characterIndex < run.charactersStart) {
+            characterIndex = run.charactersStart;
+        } else if (characterIndex > run.charactersEnd) {
+            characterIndex = run.charactersEnd - 1;
+        }
+
+        // Normalize
+        while (Float.isNaN(run.characterPositions.items[characterIndex - run.charactersStart])) {
+            characterIndex--;
+        }
+
+        // Move
+        if (offset > 0) {
+            int lastValidIndex;
+            for (int i = 0; i < offset; i++) {
+                lastValidIndex = characterIndex;
+                do {
+                    characterIndex++;
+                    if (characterIndex == run.charactersEnd) {
+                        if (++runIndex >= runs.size) {
+                            return lastValidIndex;
+                        }
+                        run = runs.items[runIndex];
+                    }
+                } while (Float.isNaN(run.characterPositions.items[characterIndex - run.charactersStart]));
+            }
+        } else if (offset < 0) {
+            for (int i = 0; i < -offset; i++) {
+                do {
+                    characterIndex--;
+                    if (characterIndex < run.charactersStart) {
+                        if (--runIndex < 0) {
+                            return 0;
+                        }
+                        run = runs.items[runIndex];
+                    }
+                } while (Float.isNaN(run.characterPositions.items[characterIndex - run.charactersStart]));
+            }
+        }
+
+        return characterIndex;
     }
 
     /**

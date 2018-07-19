@@ -18,9 +18,7 @@ public class TextLayoutIteratorTests {
     public static final TestFont FONT_ITALIC = new TestFont("italic");
     public static final TestFont FONT_BOLD = new TestFont("bold");
 
-
     /**
-     *
      * @param template text with formatting letters: 0-9 (color), R (FONT), B (FONT_BOLD) and I (FONT_ITALIC)
      * @param expected strings, chars, numbers or fonts. numbers and fonts mean: X is expected to change to given
      *                 value for next string run, allowed chars are '>' (LTR) and '<' (RTL)
@@ -83,7 +81,7 @@ public class TextLayoutIteratorTests {
                 }
             }
 
-            layoutText.init(text.chars, text.length, initialFont, initialColor, null, null, true);
+            layoutText.init(text.chars, text.length, initialFont, initialColor, null, true);
             for (int i = 0; i < regionStarts.size; i++) {
                 layoutText.addRegion(regionStarts.get(i), regionFonts.get(i), regionColors.get(i));
             }

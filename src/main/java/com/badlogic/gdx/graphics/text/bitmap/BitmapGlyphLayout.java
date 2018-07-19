@@ -82,26 +82,11 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         run.charactersStart = runStart;
         run.charactersEnd = runEnd;
 
+        run.charactersFlags |= GlyphRun.FLAG_TAB;
         if (tabIndex == -1) {
             // Ignore it
-            run.charactersFlags |= GlyphRun.FLAG_TAB_LEFT;
             run.width = 0f;
         } else {
-            switch (text.tabStopTypeFor(tabIndex)) {
-                default:
-                    assert false;
-                    // Fallthrough
-                case LayoutText.TAB_STOP_LEFT:
-                    run.charactersFlags |= GlyphRun.FLAG_TAB_LEFT;
-                    break;
-                case LayoutText.TAB_STOP_CENTER:
-                    run.charactersFlags |= GlyphRun.FLAG_TAB_CENTER;
-                    break;
-                case LayoutText.TAB_STOP_RIGHT:
-                    run.charactersFlags |= GlyphRun.FLAG_TAB_RIGHT;
-                    break;
-            }
-
             final float offset = text.tabStopOffsetFor(tabIndex, defaultTabAdvance);
             run.width = offset - startX;
             startX += run.width;
@@ -250,7 +235,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             byte or = 0;
             for (int i = runsStart; i < runsEnd; i++) {
                 final GlyphRun<BitmapFont> run = runs.items[i];
-                if ((run.charactersFlags & (GlyphRun.FLAG_LINEBREAK | GlyphRun.FLAG_MASK_TAB)) != 0) {
+                if ((run.charactersFlags & (GlyphRun.FLAG_LINEBREAK | GlyphRun.FLAG_TAB)) != 0) {
                     // Reset level of this to paragraph level
                     run.charactersLevel = (byte) (text.isLeftToRight() ? 0 : 1);
                 }
@@ -423,6 +408,8 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                 addRunsFor(chars, textRun.start, textRun.end, textRun.level, textRun.font, textRun.color, line, runs.size);
             }
 
+            //TODO Tab stops
+
             // Wrapping
             while (startX >= availableWidth) {
                 assert lineLaidRuns < runs.size;
@@ -500,7 +487,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                     // There is something to truncate
                     GlyphRun<BitmapFont> truncateRun = runs.items[truncateRunIndex];
                     int truncateFromIndex = wrapIndex - truncateRun.charactersStart;
-                    assert (truncateRun.charactersFlags & (GlyphRun.FLAG_LINEBREAK | GlyphRun.FLAG_MASK_TAB)) == 0;
+                    assert (truncateRun.charactersFlags & (GlyphRun.FLAG_LINEBREAK | GlyphRun.FLAG_TAB)) == 0;
                     float truncateToPos = truncateRun.characterPositions.items[wrapIndex - truncateRun.charactersStart];
 
                     while (true) {

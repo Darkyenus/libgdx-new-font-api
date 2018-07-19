@@ -35,13 +35,8 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
 
     /** Set if this run is a linebreak. Used when positioning caret. */
     public static final byte FLAG_LINEBREAK = 1;
-    /** Set if this run is a tab stop specified by {@link LayoutText#TAB_STOP_LEFT}. Has special behavior when wrapping. */
-    public static final byte FLAG_TAB_LEFT = 1<<1;
-    /** Set if this run is a tab stop specified by {@link LayoutText#TAB_STOP_CENTER}. Has special behavior when wrapping. */
-    public static final byte FLAG_TAB_CENTER = 1<<2;
-    /** Set if this run is a tab stop specified by {@link LayoutText#TAB_STOP_RIGHT}. Has special behavior when wrapping. */
-    public static final byte FLAG_TAB_RIGHT = 1<<3;
-    public static final byte FLAG_MASK_TAB = FLAG_TAB_LEFT | FLAG_TAB_CENTER | FLAG_TAB_RIGHT;
+    /** Set if this run is a tab stop. */
+    public static final byte FLAG_TAB = 1<<1;
 
     private GlyphRun() {
     }

@@ -16,20 +16,12 @@ import java.util.Arrays;
  * Must be initialized with {@link #init} before first use.
  *
  * <h4>Tab stops</h4>
- * <p>Specified text may contain tab character (<code>\t</code>). These generally work like in any text editor.
- * When tab character is encountered, following text shifts to the closest tab stop at equal or greater X position,
- * and is then aligned around it, based on tab stop type. If there is no such tab stop found, text shifts to next
- * line and search starts again from X = 0.</p>
- * <p>By default, there is endless amount of {@link #TAB_STOP_LEFT}-type stops {@link FontSystem}-defined amount apart.</p>
+ * <p>Specified text may contain tab character (<code>\t</code>). These generally work like left-stops in any text editor.
+ * When tab character is encountered, following text shifts to the closest tab stop at greater X position.
+ * If there is no next stop defined, tab is ignored.
+ * <p>By default, there is endless amount of stops 8-spaces apart.</p>
  */
 public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> {
-
-    /** Text extends to the right from the stop. This is the default. */
-    public static final byte TAB_STOP_LEFT = 0;
-    /** Text is centered on the stop, but shifts to the right if not enough space. */
-    public static final byte TAB_STOP_CENTER = 1;
-    /** Text extends to the left from the stop, but shifts to the right if not enough space. */
-    public static final byte TAB_STOP_RIGHT = 2;
 
     char[] text;
     int length;
@@ -47,17 +39,10 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
     final FloatArray regionColors = new FloatArray();
 
     /**
-     * May be null, same size as {@link #tabTypes} if neither are null.
-     * Contains unit-based positions of <a href="https://en.wikipedia.org/wiki/Tab_stop">tab stops</a>.
-     * Type of the tab stop is specified at the same index in {@link #tabTypes}.
+     * Contains unit-based positions of <a href="https://en.wikipedia.org/wiki/Tab_stop">(left) tab stops</a>.
+     * May be null, in which case, default spacing is used.
      */
     private float[] tabPoints = null;
-    /**
-     * May be null, same size as {@link #tabPoints} if neither are null.
-     * Contains one of: {@link #TAB_STOP_LEFT}, {@link #TAB_STOP_RIGHT} or {@link #TAB_STOP_CENTER}
-     * @see #tabPoints
-     */
-    private byte[] tabTypes = null;
 
     /**
      * Initialize base attributes.
@@ -68,22 +53,18 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
      * @param color initial color to use on the text (from {@link Color#toFloatBits()})
      * @param tabPoints may be null, contains unit-based positions of tab stops. Must be sorted from leftmost to rightmost.
      *                  Not copied, only reference held.
-     * @param tabTypes may be null, contains types of tab stops corresponding to the points in tabPoints
-     *                 Not copied, only reference held.
      * @param leftToRight if true, text is considered left-to-right. If false, right-to-left.
      * @throws NullPointerException text or font is null, or when tabPoints is null and tabTypes isn't or vice-versa
      * @throws IllegalArgumentException when tabPoints has different size than tabTypes
      */
-    public void init(char[] text, int length, Font font, float color, float[] tabPoints, byte[] tabTypes, boolean leftToRight) {
+    public void init(char[] text, int length, Font font, float color, float[] tabPoints, boolean leftToRight) {
         if (text == null) throw new NullPointerException("text");
         if (font == null) throw new NullPointerException("font");
-        if ((tabPoints == null) != (tabTypes == null)) throw new NullPointerException("tabPoints or tabTypes");
         this.text = text;
         this.length = MathUtils.clamp(length, 0, text.length);
         this.initialFont = font;
         this.initialColor = color;
         this.tabPoints = tabPoints;
-        this.tabTypes = tabTypes;
         this.leftToRight = leftToRight;
 
         regionStarts.clear();
@@ -194,7 +175,7 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
     public int tabStopIndexFor(float x, float defaultTabAdvance) {
         final float[] tabPoints = this.tabPoints;
         if (tabPoints == null) {
-            final int index = (int) Math.ceil(x / defaultTabAdvance);
+            final int index = (int) Math.floor(x / defaultTabAdvance) + 1;
             if (index < 0) {
                 return 0;
             } else {
@@ -205,6 +186,8 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         int index = Arrays.binarySearch(tabPoints, x);
         if (index < 0) {
             index = -index - 1;
+        } else {
+            index += 1;
         }
         if (index >= tabPoints.length) {
             return -1;
@@ -231,14 +214,6 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         return tabPoints[index];
     }
 
-    public byte tabStopTypeFor(int index) {
-        final byte[] tabTypes = this.tabTypes;
-        if (tabTypes == null || index < 0 || index >= tabTypes.length) {
-            return TAB_STOP_LEFT;
-        }
-        return tabTypes[index];
-    }
-
     int regionAt(int index) {
         int i = Arrays.binarySearch(regionStarts.items, 0, regionStarts.size, index);
         if (i >= 0) {
@@ -261,7 +236,6 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         regionStarts.clear();
         regionFonts.clear();
         regionColors.clear();
-        tabTypes = null;
         tabPoints = null;
         leftToRight = true;
     }
