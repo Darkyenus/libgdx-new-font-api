@@ -152,6 +152,8 @@ public class HarfBuzzTest {
 
             final Vector2 mouse = new Vector2();
 
+            boolean leftToRight = true;
+
             int caretIndex = 0;
 
             @Override
@@ -244,7 +246,11 @@ public class HarfBuzzTest {
                 Gdx.gl.glClearColor(0.8f, 0.8f, 0.8f, 1f);
                 Gdx.gl.glClear(GL_COLOR_BUFFER_BIT);
 
-                text.init(sb.chars, sb.length, font, Color.ROYAL.toFloatBits(), null, true);
+                if (Gdx.input.isKeyJustPressed(Input.Keys.F2)) {
+                    leftToRight = !leftToRight;
+                }
+
+                text.init(sb.chars, sb.length, font, Color.ROYAL.toFloatBits(), null, leftToRight);
                 //text.addRegion(5, fontItalic, Color.BLUE.toFloatBits());
                 /*for (int i = 18; i < 24; i++) {
                     if (MathUtils.randomBoolean()) {
@@ -260,7 +266,7 @@ public class HarfBuzzTest {
                 layout.clear();
                 final long layoutStart = System.nanoTime();
                 for (int i = 0; i < 100; i++) {
-                    layout.layoutText(text, 300f, Float.POSITIVE_INFINITY, Align.left, null);
+                    layout.layoutText(text, 300f, 300f, Align.left, "...");
                 }
                 final double duration = (System.nanoTime() - layoutStart) / 100_000_000.0;
                 if (Gdx.input.isKeyPressed(Input.Keys.F1)) {

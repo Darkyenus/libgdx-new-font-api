@@ -15,13 +15,13 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
     /** Runs of the layout. Ordered by lines and then by X coordinate (not by char positions).
      * Some runs may not contain any glyphs and serve just to specify which (non-rendered) glyphs are on which line. */
     protected final Array<GlyphRun<Font>> runs = new Array<>(GlyphRun.class);
-    /** Values exposed by {@link #width()} and {@link #height()}. */
-    protected float width, height;
+    /** Value exposed by {@link #width()}. */
+    protected float width;
     /** Contains run character start index (msb 17bits, msb bit 0) with index of run which contains it (lsb 15bits).
      * Ordered for quick binary search of character->run mapping. */
     private final IntArray charRuns = new IntArray();
     /** For each line in the layout (even if it has no GlyphRun), contains its height + <b>height of all previous lines</b>.
-     * Size determines the amount of lines. Must have at least one entry. */
+     * Size determines the amount of lines. Must have at least one entry. Determines {@link #height()}. */
     protected final FloatArray lineHeights = new FloatArray();
 
     /** Sets this text layout to contain specified text, laid out in a virtual rectangle
@@ -35,14 +35,14 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
      *
      * @param text to lay out (may be modified after this call is done, it will not reflect in the layout)
      * @param availableWidth to which the text must fit. Values <= 0 are same as {@link Float#POSITIVE_INFINITY}
-     * @param availableHeight to which the text must fit to not be truncated with elipsis.
+     * @param availableHeight to which the text must fit to not be truncated with ellipsis.
      *                        Represents units when positive, negative amount of lines when negative (rounded to integer),
      *                        or no limit when 0. Note that at least one line will be always rendered.
      * @param horizontalAlign one of horizontal alignments from {@link com.badlogic.gdx.utils.Align}
-     * @param elipsis to use when the text is too long and doesn't fit available space. Will be rendered using
+     * @param ellipsis to use when the text is too long and doesn't fit available space. Will be rendered using
      *                the {@link LayoutText#initialFont} and {@link LayoutText#initialColor} of the text.
      *                May be null, in which case no ellipsis is used. */
-    public abstract void layoutText(LayoutText<Font> text, float availableWidth, float availableHeight, int horizontalAlign, String elipsis);
+    public abstract void layoutText(LayoutText<Font> text, float availableWidth, float availableHeight, int horizontalAlign, String ellipsis);
 
     protected final void buildCharPositions() {
         final IntArray charRuns = this.charRuns;
@@ -53,13 +53,18 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
 
         for (int i = 0; i < runCount; i++) {
             final GlyphRun<Font> run = glyphRuns[i];
+            if (run.isEllipsis()) {
+                continue;
+            }
             assert (run.charactersStart & ~0xFFFF) == 0;
             charRuns.add(run.charactersStart << 15 | i);
         }
 
         charRuns.sort();
+        assert assertCharRunsValid(charRuns);
+    }
 
-        //TODO DEBUG Check assertions
+    private boolean assertCharRunsValid(IntArray charRuns) {
         int lastCharStart = -1;
         for (int i = 0; i < charRuns.size; i++) {
             final int item = charRuns.items[i];
@@ -70,32 +75,34 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
 
             assert runs.items[runIndex].charactersStart == characterStart;
         }
+        return true;
     }
 
     /**
      * @param characterIndex index of character whose GlyphRun is searched for
-     * @param clamp if true and characterIndex is out of bounds, return closest valid index
+     * @param closest if true and characterIndex is out of bounds, return closest valid index
      *              (may still return invalid index if there are no runs)
      * @return index into the {@link #runs} array of the run which contains character at given index
      */
-    protected final int indexOfRunOf(int characterIndex, boolean clamp) {
+    protected final int indexOfRunOf(int characterIndex, boolean closest) {
         final int[] charRunItems = charRuns.items;
+        final int charRunCount = charRuns.size;
         final Array<GlyphRun<Font>> runs = this.runs;
 
-        if ((characterIndex & ~0xFFFF) != 0 || runs.size == 0) {
+        if ((characterIndex & ~0xFFFF) != 0 || charRunCount <= 0) {
             // characterIndex is out of supported bounds or there are no runs
-            if (clamp && runs.size > 0) {
+            if (closest && charRunCount > 0) {
                 if (characterIndex < 0) {
                     return charRunItems[0] & 0x7FFF;
                 } else {
-                    return charRunItems[runs.size - 1] & 0x7FFF;
+                    return charRunItems[charRunCount - 1] & 0x7FFF;
                 }
             }
             return -1;
         }
 
         final int key = characterIndex << 15 | 0x7FFF;
-        final int i = Arrays.binarySearch(charRunItems, 0, charRuns.size, key);
+        final int i = Arrays.binarySearch(charRunItems, 0, charRunCount, key);
         final int runIndex;
         if (i >= 0) {
             // Found key, which assumes 0x7FFF index, so the run index must be 0x7FFF
@@ -104,7 +111,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
             final int baseIndex = -i - 2;
             if (baseIndex < 0) {
                 // This index is before first run
-                return clamp ? charRunItems[0] & 0x7FFF : -1;
+                return closest ? charRunItems[0] & 0x7FFF : -1;
             }
             runIndex = charRunItems[baseIndex] & 0x7FFF;
         }
@@ -113,7 +120,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
         if (run.charactersEnd > characterIndex) {
             return runIndex;
         }
-        return clamp ? charRunItems[runs.size - 1] & 0x7FFF : -1;
+        return closest ? charRunItems[charRunCount - 1] & 0x7FFF : -1;
     }
 
     /** @return total width of the currently laid out text */
@@ -123,7 +130,13 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
 
     /** @return total height of the currently laid out text */
     public final float height() {
-        return height;
+        FloatArray lineHeights = this.lineHeights;
+        int lastIndex = lineHeights.size - 1;
+        if (lastIndex < 0) {
+            return 0f;
+        } else {
+            return lineHeights.items[lastIndex];
+        }
     }
 
     private static final FlushablePool<Rectangle> SELECTION_POOL = new FlushablePool<Rectangle>(3, 16){
@@ -154,7 +167,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
             }
         } else if (index >= run.charactersEnd) {
             // Assuming that this is the last run, because we wouldn't be at the end if it wasn't
-            if ((run.charactersFlags & GlyphRun.FLAG_LINEBREAK) != 0) {
+            if ((run.characterFlags & GlyphRun.FLAG_LINEBREAK) != 0) {
                 assert line + 1 <= lineHeights.size;
                 final float nY = -lineHeights.items[line+1];
                 final float nHeight = -nY - lineHeights.items[line];
@@ -232,10 +245,12 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
                 do {
                     characterIndex++;
                     if (characterIndex == run.charactersEnd) {
-                        if (++runIndex >= runs.size) {
-                            return lastValidIndex;
-                        }
-                        run = runs.items[runIndex];
+                        do {
+                            if (++runIndex >= runs.size) {
+                                return lastValidIndex;
+                            }
+                            run = runs.items[runIndex];
+                        } while (run.isEllipsis());
                     }
                 } while (Float.isNaN(run.characterPositions.items[characterIndex - run.charactersStart]));
             }
@@ -244,10 +259,12 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
                 do {
                     characterIndex--;
                     if (characterIndex < run.charactersStart) {
-                        if (--runIndex < 0) {
-                            return 0;
-                        }
-                        run = runs.items[runIndex];
+                        do {
+                            if (--runIndex < 0) {
+                                return 0;
+                            }
+                            run = runs.items[runIndex];
+                        } while (run.isEllipsis());
                     }
                 } while (Float.isNaN(run.characterPositions.items[characterIndex - run.charactersStart]));
             }
@@ -258,11 +275,12 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
 
     /**
      * Return index of character whose glyph is at given coordinate.
-     * If there is no such glyph, returns -1, unless clamp is true, in which case index of closest glyph is returned.
+     * If there is no such glyph, returns -1, unless closest is true, in which case index of closest glyph is returned.
      * When position is after last glyph, may return index equal to text length.
+     * @param closest if true, return the closest character, even if there is no character directly at the cursor
      * @return index into the laid out text or -1 when no such glyph and clamp is false or when there is no text laid out
      */
-    public final int getIndexAt(float x, float y, boolean clamp) {
+    public final int getIndexAt(float x, float y, boolean closest) {
         final Array<GlyphRun<Font>> runs = this.runs;
         if (runs.size == 0) {
             return -1;
@@ -272,7 +290,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
 
         // Find line
         if (y < 0f) {
-            if (clamp) {
+            if (closest) {
                 y = 0f;
             } else {
                 return -1;
@@ -284,19 +302,23 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
             line = -line - 1;
         }
         if (line >= lineHeights.size) {
-            if (clamp) {
+            if (closest) {
                 line = lineHeights.size - 1;
             } else {
                 return -1;
             }
         }
 
+        // Find run
         final GlyphRun<Font>[] glyphRuns = runs.items;
         GlyphRun<Font> lastRun = runs.items[0];
         for (int i = 0; i < runs.size; i++) {
             final GlyphRun<Font> run = glyphRuns[i];
             if (run.line > line) {
                 break;
+            }
+            if (run.isEllipsis()) {
+                continue;
             }
             if (run.line == line && run.x > x) {
                 if (lastRun.line < line) {
@@ -307,9 +329,13 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
             lastRun = run;
         }
 
+        if (lastRun.isEllipsis()) {
+            return closest ? 0 : -1;
+        }
+
 
         x -= lastRun.x;
-        if (!clamp) {
+        if (!closest) {
             if (x < 0f || x > lastRun.width) {
                 return -1;
             }
@@ -352,7 +378,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
         }
 
         int index = lastRun.charactersStart + (x - leftX < rightX - x ? leftIndex : rightIndex);
-        if (index == lastRun.charactersEnd && (lastRun.charactersFlags & GlyphRun.FLAG_LINEBREAK) != 0
+        if (index == lastRun.charactersEnd && (lastRun.characterFlags & GlyphRun.FLAG_LINEBREAK) != 0
                 && lastRun.charactersEnd - 1 >= lastRun.charactersStart) {
             // Return position before the linebreak
             index--;
@@ -366,7 +392,6 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
     @SuppressWarnings("unchecked")
     public void clear() {
         width = 0f;
-        height = 0f;
 
         GlyphRun.<Font>pool().freeAll(runs);
         runs.clear();

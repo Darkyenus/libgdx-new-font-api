@@ -226,6 +226,14 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         return leftToRight;
     }
 
+    public Font initialFont() {
+        return initialFont;
+    }
+
+    public float initialColor() {
+        return initialColor;
+    }
+
     /**
      * Clear all properties, including text, base properties and all regions.
      * Does not need to be called before {@link #init}, call only to prevent memory leaks.

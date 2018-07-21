@@ -12,6 +12,7 @@ import com.darkyen.resourcepacker.PreferSymlinks
 import wemi.Archetypes
 import wemi.Keys
 import wemi.WemiException
+import wemi.collections.toMutable
 import wemi.compile.JavaCompilerFlags.customFlags
 import wemi.dependency.Repository.M2.Companion.Classifier
 import wemi.util.LocatedPath
@@ -48,6 +49,7 @@ val experimentation by project(Archetypes.JavaProject) {
     }
 
     extend (running) {
+        runOptions add { "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005" }
         unmanagedDependencies add { LocatedPath(path("libs/harfbuzz-natives.jar")) }
     }
 

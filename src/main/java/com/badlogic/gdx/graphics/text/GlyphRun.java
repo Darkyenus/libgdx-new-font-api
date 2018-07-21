@@ -37,6 +37,9 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
     public static final byte FLAG_LINEBREAK = 1;
     /** Set if this run is a tab stop. */
     public static final byte FLAG_TAB = 1<<1;
+    /** Set if this run is an ellipsis run and does not hold valid character position/range info.
+     * (i.e. {@link #charactersStart}, {@link #charactersEnd} and {@link #characterPositions} is empty) */
+    public static final byte FLAG_ELLIPSIS = 1<<2;
 
     private GlyphRun() {
     }
@@ -78,12 +81,13 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
      * If there is no next run, use {@link #width}, unless the last character of this run is <code>\n</code>
      * (which is signified by {@link GlyphRun#FLAG_LINEBREAK}), in which case beginning of next line should be used.*/
     public final FloatArray characterPositions = new FloatArray(true, DEFAULT_SIZE);
-    /** Content related flags. GlyphLayout may put own flags here, allocate them from most significant bit.
-     * @see GlyphRun#FLAG_LINEBREAK
-     * @see GlyphRun#FLAG_TAB_LEFT and friends */
-    public byte charactersFlags;
     /** Bidi level of this run. */
     public byte charactersLevel;
+    /** Content related flags. GlyphLayout may put own flags here, allocate them from most significant bit.
+     * @see GlyphRun#FLAG_LINEBREAK
+     * @see GlyphRun#FLAG_TAB
+     * @see GlyphRun#FLAG_ELLIPSIS */
+    public byte characterFlags;
 
     /**
      * @return width of the run, extended by draw bounds of last glyph, if those protrude {@link #width}
@@ -101,6 +105,10 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
         return LayoutTextRunIterable.TextRun.isLevelLtr(charactersLevel);
     }
 
+    public boolean isEllipsis() {
+        return (characterFlags & GlyphRun.FLAG_ELLIPSIS) != 0;
+    }
+
     public void ensureGlyphCapacity(int capacity) {
         glyphs.ensureCapacity(capacity);
         glyphX.ensureCapacity(capacity);
@@ -112,7 +120,7 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
         line = 0;
         width = 0;
         charactersStart = charactersEnd = -1;
-        charactersFlags = 0;
+        characterFlags = 0;
 
         glyphs.clear();
         glyphX.clear();
