@@ -7,6 +7,7 @@ import com.badlogic.gdx.utils.FloatArray;
 import com.badlogic.gdx.utils.IntArray;
 
 import java.util.Arrays;
+import java.util.Locale;
 
 /**
  * Represents a text to be laid out by {@link GlyphLayout}.
@@ -29,6 +30,7 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
     Font initialFont;
     float initialColor;
     boolean leftToRight;
+    private Locale locale;
 
     /** Indices of region starts. Region ends with end of text or start of next region.
      * There are never 0-length regions. */
@@ -54,10 +56,12 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
      * @param tabPoints may be null, contains unit-based positions of tab stops. Must be sorted from leftmost to rightmost.
      *                  Not copied, only reference held.
      * @param leftToRight if true, text is considered left-to-right. If false, right-to-left.
+     * @param locale to use when manipulating this text. Used, for example, when determining line-breaks.
+     *               Use null to fall back to optimized algorithms for latin-like text.
      * @throws NullPointerException text or font is null, or when tabPoints is null and tabTypes isn't or vice-versa
      * @throws IllegalArgumentException when tabPoints has different size than tabTypes
      */
-    public void init(char[] text, int length, Font font, float color, float[] tabPoints, boolean leftToRight) {
+    public void init(char[] text, int length, Font font, float color, float[] tabPoints, boolean leftToRight, Locale locale) {
         if (text == null) throw new NullPointerException("text");
         if (font == null) throw new NullPointerException("font");
         this.text = text;
@@ -66,6 +70,7 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         this.initialColor = color;
         this.tabPoints = tabPoints;
         this.leftToRight = leftToRight;
+        this.locale = locale;
 
         regionStarts.clear();
         regionFonts.clear();
@@ -234,6 +239,10 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         return initialColor;
     }
 
+    public Locale locale() {
+        return locale;
+    }
+
     /**
      * Clear all properties, including text, base properties and all regions.
      * Does not need to be called before {@link #init}, call only to prevent memory leaks.
@@ -246,6 +255,7 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         regionColors.clear();
         tabPoints = null;
         leftToRight = true;
+        locale = null;
     }
 
 }

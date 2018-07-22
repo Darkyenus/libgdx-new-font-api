@@ -57,7 +57,7 @@ to ease transition for users and to allow some code reuse.
 	This replaces old markup system, as dealing with characters inline with markup added a lot of complexity and did not really work when the text
 	was to be edited. Markup to `LayoutText` converter will still be provided, as it is a convenient and efficient
 	way to describe text properties.
-	- It also holds info about tab-stop types and positions
+	- It also holds info about tab-stop positions
 
 Example usage in pseudocode:
 ```
@@ -103,7 +103,8 @@ and ellipsis truncation.
 - BitmapFontSystem
 	- Loading
 	- Multiple font & color shaping
-	- Line wrapping
+	- Line wrapping & dimension limits
+	- Ellipsis
 	- Tab stops
 - HarfBuzz bindings
 - Text editing introspection
@@ -113,16 +114,11 @@ and ellipsis truncation.
 
 ### ToDo
 - BitmapFontSystem
-	- Vertical line wrapping
-	- Ellipsis
-	- Tab stops in RTL (no idea what happens there)
 	- Optimize for heavily wrapped text
+	- Fallback fonts
 - Text editing introspection
 	- "how should I render selection?"
 - Markup to `LayoutText` converter
 - API shortcuts for everyday use, where not all features are needed
 - HBFontSystem
 	- everything
-
-### To think about and possibly do
-- Font fallbacks, when certain glyph is missing in some font, use it from a different font

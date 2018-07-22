@@ -1,12 +1,15 @@
 package com.badlogic.gdx.graphics.text.bitmap;
 
-import com.badlogic.gdx.graphics.text.CharArrayIterator;
 import com.badlogic.gdx.graphics.text.*;
 import com.badlogic.gdx.graphics.text.LayoutTextRunIterable.TextRun;
-import com.badlogic.gdx.utils.*;
+import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.ByteArray;
+import com.badlogic.gdx.utils.FloatArray;
+import com.badlogic.gdx.utils.ObjectMap;
 
 import java.text.Bidi;
 import java.text.BreakIterator;
+import java.util.Locale;
 
 /**
  * Lays out codepoints for {@link BitmapFontSystem}.
@@ -19,7 +22,6 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
     private static final char COLLAPSIBLE_SPACE = ' ';
 
-    @Deprecated //TODO Try do to without, infer it from previous run
     private float startX;
 
     private void addLineHeight(float height) {
@@ -86,7 +88,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             run.width = 0f;
         } else {
             final float offset = text.tabStopOffsetFor(tabIndex, defaultTabAdvance);
-            run.width = offset - startX;
+            run.width = offset - run.x;
             startX += run.width;
         }
         runs.add(run);
@@ -232,11 +234,11 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         return 1;
     }
 
-    /** Reorders run according to BiDi algorithm,
-     * computes line height, sets Y of runs on the line, and adjusts variables for next line. */
+    /** Reorders run according to BiDi algorithm, computes line height, sets Y of runs on the line,
+     * and adjusts variables for next line. */
     private void completeLine(final LayoutText<BitmapFont> text, final int runsStart, final int runsEnd,
                               final BitmapFont defaultFont) {
-        assert runsStart < runsEnd : runsStart + " < "+ runsEnd;
+        assert runsStart <= runsEnd : runsStart + " <= "+ runsEnd;
         final Array<GlyphRun<BitmapFont>> runs = this.runs;
 
         // Find out how the runs need to be reordered
@@ -321,7 +323,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         final float lineStartY = -height();
 
         // Shift each run so that it shares common baseline with all fonts on line
-        GlyphRun<BitmapFont> run = null;
+        GlyphRun<BitmapFont> run;
         final float finalLineHeight = topToBaseline + baselineToDown;
         for (int i = runsStart; i < runsEnd; i++) {
             run = runs.items[i];
@@ -330,9 +332,6 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         }
 
         addLineHeight(finalLineHeight);
-
-        // This line had some runs, adjust our overall width
-        this.width = Math.max(this.width, run.x + run.getDrawWidth());
 
         startX = 0f;
     }
@@ -351,19 +350,38 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
     }
 
     /** @return {@link GlyphRun#charactersEnd} value with which the run would have to be constructed with,
-     * so that its {@link GlyphRun#width} would be <= <code>runWidth</code> */
-    private int charEndIndexForTargetRunWidth(GlyphRun<BitmapFont> run, float runWidth) {
-        //TODO optimize with binary search?
+     * so that its {@link GlyphRun#width} would be <= <code>runWidth</code>. */
+    private int charEndIndexForTargetRunWidth(GlyphRun<BitmapFont> run, float targetRunWidth) {
+        final int charPositionCount = run.characterPositions.size;
+        final float[] charPositions = run.characterPositions.items;
+
         int characterIndexInWrapRun = 0;
-        for (int i = 0; i < run.characterPositions.size; i++) {
-            final float position = run.characterPositions.items[i];
-            if (Float.isNaN(position)) {
-                continue;
+        if (run.isLtr()) {
+            for (int i = 0; i < charPositionCount; i++) {
+                final float position = charPositions[i];
+                if (Float.isNaN(position)) {
+                    continue;
+                }
+                if (position >= targetRunWidth) {
+                    break;
+                }
+                characterIndexInWrapRun = i;
             }
-            if (position >= runWidth) {
-                break;
+        } else {
+            final float runWidth = run.width;
+            for (int i = 0; i < charPositionCount; i++) {
+                float position = charPositions[i];
+                if (Float.isNaN(position)) {
+                    continue;
+                }
+
+                position = runWidth - position;
+
+                if (position >= targetRunWidth) {
+                    break;
+                }
+                characterIndexInWrapRun = i;
             }
-            characterIndexInWrapRun = i;
         }
         return run.charactersStart + characterIndexInWrapRun;
     }
@@ -401,6 +419,70 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         return insertIndex;
     }
 
+    /**
+     * Returns character index of line-break point at which the characters should fold to next line.
+     * Character at index and following characters may be {@link #COLLAPSIBLE_SPACE}, in which case the linebreak should
+     * be at the first character which is not that character.
+     * @param hitIndex which should already be at the next line
+     * @return index in [lineStart, lineEnd) range
+     */
+    private int findWrapPointFor(LayoutText<BitmapFont> text, final int lineStart, final int lineEnd, final int hitIndex) {
+        assert hitIndex >= lineStart && hitIndex < lineEnd;
+
+        if (hitIndex <= lineStart + 1) {
+            // We have to wrap at at least one character, at all times, so no reason to search further
+            return lineStart + 1;
+        }
+
+        final char[] chars = text.text();
+        final Locale locale = text.locale();
+        if (locale == null) {
+            int i = hitIndex;
+            if (!Character.isWhitespace(chars[i])) {
+                // Shift left, one after the nearest whitespace
+                while (i > lineStart && !Character.isWhitespace(chars[i - 1])) {
+                    i--;
+                }
+            } // else: Don't do anything, we can break here
+
+            if (i <= lineStart) {
+                // There is no whitespace to hang on, fallback to by-char mode
+                i = hitIndex;
+            }
+            return i;
+        } else {
+            // Use break iterator
+            BreakIterator lineBreakIterator = getLineBreakIterator(text, lineStart, lineEnd, locale);
+
+            if (lineBreakIterator.isBoundary(hitIndex)) {
+                // It is already perfect.
+                return hitIndex;
+            }
+            // Can we use hitIndex anyway because of collapsing?
+            collapseToNextBreak:
+            {
+                final int following = lineBreakIterator.following(hitIndex);
+                if (following == BreakIterator.DONE) {
+                    break collapseToNextBreak;
+                }
+                for (int i = hitIndex; i < following; i++) {
+                    if (chars[i] != COLLAPSIBLE_SPACE) {
+                        break collapseToNextBreak;
+                    }
+                }
+                return hitIndex;
+            }
+
+            final int preceding = lineBreakIterator.preceding(hitIndex);
+            if (preceding == BreakIterator.DONE || preceding <= lineStart) {
+                // Fall back to char mode
+                return hitIndex;
+            }
+
+            return preceding;
+        }
+    }
+
     @Override
     public void layoutText(LayoutText<BitmapFont> text, float availableWidth, float availableHeight, int horizontalAlign, String ellipsis) {
         clear();
@@ -435,7 +517,6 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             final int flags = textRun.flags;
             final boolean lastTextRun = (flags & TextRun.FLAG_LAST_RUN) != 0;
             final boolean linebreak = (flags & TextRun.FLAG_LINE_BREAK) != 0;
-            boolean completeLine = lastTextRun || linebreak;
 
             // Add the run(s)
             if (linebreak) {
@@ -445,8 +526,6 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             } else {
                 addRunsFor(chars, textRun.start, textRun.end, textRun.level, textRun.font, textRun.color, line, runs.size, false);
             }
-
-            //TODO Tab stops (RTL?)
 
             // Wrapping
             while (startX >= availableWidth) {
@@ -477,32 +556,13 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                 // Find suitable breaking point
                 final int lineCharactersStart = runs.items[lineLaidRuns].charactersStart;
                 final int lineCharactersEnd = runs.items[runs.size - 1].charactersEnd;
-                final BreakIterator lineBreakIterator = getLineBreakIterator(
-                        text, lineCharactersStart, lineCharactersEnd);
-                // Character wrap index denotes the first character, which should already be on a new line
-                int wrapIndex = lineBreakIterator.preceding(wrapPointCharacterIndex);
-                if (wrapIndex == BreakIterator.DONE || wrapIndex <= lineCharactersStart) {
-                    // Fallback to char-based breaking
-                    wrapIndex = wrapPointCharacterIndex;
-                }
-
-                if (wrapIndex <= lineCharactersStart) {
-                    // At least one character must be on line
-                    wrapIndex = lineCharactersStart + 1;
-                    if (wrapIndex == lineCharactersEnd) {
-                        // Not much to do here, we only have one character to work with and we can't wrap that.
-                        // Just mark the line as ended for normal line-ending code below
-                        completeLine = true;
-                        break;// no more wrapping
-                    }
-                }
+                final int wrapIndex = findWrapPointFor(text, lineCharactersStart, lineCharactersEnd, wrapPointCharacterIndex);
 
                 // There may be some whitespace after the wrap index, which is not wrapped to the new line, but rather
                 // shrunk to 0-width on the last line. This is the index, where such whitespace ends (it starts at wrapIndex).
                 int realWrapIndex = wrapIndex;
                 // Collapse any spaces at the end of the line
                 while (realWrapIndex < lineCharactersEnd && chars[realWrapIndex] == COLLAPSIBLE_SPACE) {
-                    //TODO Is this triggered correctly?
                     realWrapIndex++;
                 }
 
@@ -573,7 +633,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                 // styling or by introducing explicit linebreaks.
             }
 
-            if (completeLine) {
+            if (lastTextRun || linebreak) {
                 completeLine(text, lineLaidRuns, runs.size, textRun.font);
                 lineLaidRuns = runs.size;
 
@@ -697,10 +757,11 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                     }
                     // This run does not need to be removed, but we need to trim it
                     startX = trimmedRun.x;
+                    final boolean trimmedRunLtr = trimmedRun.isLtr();
                     int charactersEnd = charEndIndexForTargetRunWidth(trimmedRun, availableWidth - ellipsisWidth - trimmedRun.x);
                     runs.removeIndex(trimmedIndex);
                     ellipsisStart--;
-                    if (charactersEnd <= trimmedRun.charactersStart) {
+                    if (trimmedRunLtr ? charactersEnd <= trimmedRun.charactersStart : charactersEnd > trimmedRun.charactersEnd) {
                         // Run has to be removed completely anyway
                         break;
                     } else {
@@ -744,18 +805,23 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         startX = 0f;
     }
 
-    private static BreakIterator getLineBreakIterator_lineBreakIteratorCache;
+    private static ObjectMap<Locale, BreakIterator> getLineBreakIterator_lineBreakIteratorCache;
     private static CharArrayIterator getLineBreakIterator_charIteratorCache;
 
-    private static <F extends Font> BreakIterator getLineBreakIterator(LayoutText<F> text, int start, int end) {
-        //TODO Should something be done about locale?
-        BreakIterator breakIterator = BitmapGlyphLayout.getLineBreakIterator_lineBreakIteratorCache;
+    private static <F extends Font> BreakIterator getLineBreakIterator(LayoutText<F> text, int start, int end, Locale locale) {
+        ObjectMap<Locale, BreakIterator> brItMap = BitmapGlyphLayout.getLineBreakIterator_lineBreakIteratorCache;
         CharArrayIterator charIterator = getLineBreakIterator_charIteratorCache;
-        if (breakIterator == null) {
-            breakIterator = getLineBreakIterator_lineBreakIteratorCache = BreakIterator.getLineInstance();
+        if (brItMap == null) {
+            brItMap = getLineBreakIterator_lineBreakIteratorCache = new ObjectMap<>();
             charIterator = getLineBreakIterator_charIteratorCache = new CharArrayIterator();
         }
         charIterator.reset(text.text(), start, end);
+
+        BreakIterator breakIterator = brItMap.get(locale);
+        if (breakIterator == null) {
+            breakIterator = BreakIterator.getLineInstance(locale);
+            brItMap.put(locale, breakIterator);
+        }
         breakIterator.setText(charIterator);
         return breakIterator;
     }

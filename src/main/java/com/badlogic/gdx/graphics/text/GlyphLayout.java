@@ -16,7 +16,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
      * Some runs may not contain any glyphs and serve just to specify which (non-rendered) glyphs are on which line. */
     protected final Array<GlyphRun<Font>> runs = new Array<>(GlyphRun.class);
     /** Value exposed by {@link #width()}. */
-    protected float width;
+    private float width;
     /** Contains run character start index (msb 17bits, msb bit 0) with index of run which contains it (lsb 15bits).
      * Ordered for quick binary search of character->run mapping. */
     private final IntArray charRuns = new IntArray();
@@ -47,12 +47,15 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
     protected final void buildCharPositions() {
         final IntArray charRuns = this.charRuns;
 
+        float width = 0f;
+
         final GlyphRun<Font>[] glyphRuns = this.runs.items;
         final int runCount = this.runs.size;
         assert (runCount & ~0x7FFF) == 0;
 
         for (int i = 0; i < runCount; i++) {
             final GlyphRun<Font> run = glyphRuns[i];
+            width = Math.max(width, run.x + run.getDrawWidth());
             if (run.isEllipsis()) {
                 continue;
             }
@@ -60,6 +63,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
             charRuns.add(run.charactersStart << 15 | i);
         }
 
+        this.width = width;
         charRuns.sort();
         assert assertCharRunsValid(charRuns);
     }
