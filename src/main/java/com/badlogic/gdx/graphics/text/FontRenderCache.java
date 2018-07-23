@@ -57,7 +57,7 @@ public class FontRenderCache {
      * NOTE: Result is valid only as long as font pages don't change and this method nor clear() is called (again).
      * @return array where it[font.glyph.page] == FloatArray to which vertex data should be added to
      * (usually returns the same instance) */
-    private <_Font extends Font> FloatArray[] preparePageMappingForFont(_Font font) {
+    private <F extends Font<F>> FloatArray[] preparePageMappingForFont(F font) {
         final Texture[] fontTextures = font.getPages();
 
         final Array<FloatArray> pageVertices = this.pageVertices;

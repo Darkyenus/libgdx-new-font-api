@@ -2,6 +2,7 @@ package com.badlogic.gdx.graphics.text.bitmap;
 
 import com.badlogic.gdx.graphics.text.*;
 import com.badlogic.gdx.graphics.text.LayoutTextRunIterable.TextRun;
+import com.badlogic.gdx.graphics.text.util.CharArrayIterator;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ByteArray;
 import com.badlogic.gdx.utils.FloatArray;
@@ -435,7 +436,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         }
 
         final char[] chars = text.text();
-        final Locale locale = text.locale();
+        final Locale locale = text.getLocale();
         if (locale == null) {
             int i = hitIndex;
             if (!Character.isWhitespace(chars[i])) {
@@ -716,7 +717,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             if (ellipsis != null && !ellipsis.isEmpty()) {
                 final float startXBeforeEllipsis = startX;
                 addRunsFor(ellipsis.toCharArray(), 0, ellipsis.length(),
-                        (byte) (text.isLeftToRight() ? 0 : 1), text.initialFont(), text.initialColor(),
+                        (byte) (text.isLeftToRight() ? 0 : 1), text.getInitialFont(), text.getInitialColor(),
                         line, ellipsisStart, true);
                 ellipsisWidth = startX - startXBeforeEllipsis;
             } else {
@@ -767,7 +768,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             }
 
             // Re-complete the line
-            completeLine(text, lineLaidRuns, runs.size, text.initialFont());
+            completeLine(text, lineLaidRuns, runs.size, text.getInitialFont());
         }
 
         LayoutTextRunIterable.free(iterable);
@@ -793,7 +794,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
     private static ObjectMap<Locale, BreakIterator> getLineBreakIterator_lineBreakIteratorCache;
     private static CharArrayIterator getLineBreakIterator_charIteratorCache;
 
-    private static <F extends Font> BreakIterator getLineBreakIterator(LayoutText<F> text, int start, int end, Locale locale) {
+    private static <F extends Font<F>> BreakIterator getLineBreakIterator(LayoutText<F> text, int start, int end, Locale locale) {
         ObjectMap<Locale, BreakIterator> brItMap = BitmapGlyphLayout.getLineBreakIterator_lineBreakIteratorCache;
         CharArrayIterator charIterator = getLineBreakIterator_charIteratorCache;
         if (brItMap == null) {
@@ -821,7 +822,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
     private static ByteArray bidiLevelsFor_levelCache;
 
-    private static <F extends Font> byte[] bidiLevelsFor(GlyphRun<F>[] runs, int runsStart, int runsEnd) {
+    private static <F extends Font<F>> byte[] bidiLevelsFor(GlyphRun<F>[] runs, int runsStart, int runsEnd) {
         ByteArray levels = bidiLevelsFor_levelCache;
         final int runCount = runsEnd - runsStart;
         if (levels == null) {

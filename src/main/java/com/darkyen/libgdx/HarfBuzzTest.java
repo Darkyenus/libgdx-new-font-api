@@ -283,7 +283,9 @@ public class HarfBuzzTest {
                     caretIndex = 0;
                 }
 
-                text.init(sb.chars, sb.length, font, Color.ROYAL.toFloatBits(), null, leftToRight, null);
+                text.init(font, Color.ROYAL.toFloatBits());
+                text.setLeftToRight(leftToRight);
+                text.setText(sb);
                 //text.addRegion(5, fontItalic, Color.BLUE.toFloatBits());
                 /*for (int i = 18; i < 24; i++) {
                     if (MathUtils.randomBoolean()) {

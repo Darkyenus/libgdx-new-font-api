@@ -11,7 +11,7 @@ import com.badlogic.gdx.utils.Pool;
  *
  * @param <F> Font that is used in the run - only for type safety of the API, can be freely changed on single instance when pooling
  */
-public final class GlyphRun<F extends Font> implements Pool.Poolable {
+public final class GlyphRun<F extends Font<F>> implements Pool.Poolable {
 
     @SuppressWarnings("unchecked")
     private static final Pool<GlyphRun> POOL = new Pool<GlyphRun>(64, 2048) {
@@ -27,7 +27,7 @@ public final class GlyphRun<F extends Font> implements Pool.Poolable {
      * Not exposed as field because of problems with generics, but always returns the same instance.
      */
     @SuppressWarnings("unchecked")
-    public static <F extends Font> Pool<GlyphRun<F>> pool() {
+    public static <F extends Font<F>> Pool<GlyphRun<F>> pool() {
         return (Pool<GlyphRun<F>>)(Pool)POOL;
     }
 

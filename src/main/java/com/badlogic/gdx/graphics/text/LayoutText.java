@@ -1,10 +1,11 @@
 package com.badlogic.gdx.graphics.text;
 
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.FloatArray;
 import com.badlogic.gdx.utils.IntArray;
+import com.badlogic.gdx.utils.Pool;
+import com.badlogic.gdx.utils.StringBuilder;
 
 import java.util.Arrays;
 import java.util.Locale;
@@ -14,7 +15,7 @@ import java.util.Locale;
  * Contains characters of the text, base font and color of the text,
  * and zero or more regions (defined by their start position), that may override base font or color.
  *
- * Must be initialized with {@link #init} before first use.
+ * Must be initialized with {@link #init(Font, float)} before first use.
  *
  * <h4>Tab stops</h4>
  * <p>Specified text may contain tab character (<code>\t</code>). These generally work like left-stops in any text editor.
@@ -22,21 +23,23 @@ import java.util.Locale;
  * If there is no next stop defined, tab is ignored.
  * <p>By default, there is endless amount of stops 8-spaces apart.</p>
  */
-public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> {
+public final class LayoutText<F extends Font<F>> implements Pool.Poolable {
 
-    char[] text;
-    int length;
+    public static final char[] NO_TEXT = new char[0];
 
-    Font initialFont;
+    char[] text = NO_TEXT;
+    int length = 0;
+
+    F initialFont;
     float initialColor;
-    boolean leftToRight;
-    private Locale locale;
+    boolean leftToRight = true;
+    private Locale locale = null;
 
     /** Indices of region starts. Region ends with end of text or start of next region.
      * There are never 0-length regions. */
     final IntArray regionStarts = new IntArray();
     /** Fonts corresponding to the regions */
-    final Array<Font> regionFonts = new Array<>(com.badlogic.gdx.graphics.text.Font.class);
+    final Array<F> regionFonts = new Array<>(Font.class);
     /** Colors corresponding to the regions */
     final FloatArray regionColors = new FloatArray();
 
@@ -46,59 +49,65 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
      */
     private float[] tabStopPositions = null;
 
-    /**
-     * Initialize base attributes.
-     *
-     * @param text characters that will be part of the layout. Not copied, only reference held.
-     * @param length of text to use
-     * @param font initial font to use on the text
-     * @param color initial color to use on the text (from {@link Color#toFloatBits()})
-     * @param tabStopPositions may be null, contains unit-based positions of tab stops. Must be sorted from leftmost to rightmost.
-     *                         Not copied, only reference held. Note that these positions give meaningful results only in left-aligned text (even for RTL scripts).
-     * @param leftToRight if true, text is considered left-to-right. If false, right-to-left.
-     * @param locale to use when manipulating this text. Used, for example, when determining line-breaks.
-     *               Use null to fall back to optimized algorithms for latin-like text.
-     * @throws NullPointerException text or font is null, or when tabStopPositions is null and tabTypes isn't or vice-versa
-     * @throws IllegalArgumentException when tabStopPositions has different size than tabTypes
-     */
-    public void init(char[] text, int length, Font font, float color, float[] tabStopPositions, boolean leftToRight, Locale locale) {
-        if (text == null) throw new NullPointerException("text");
+    /** Reset the text to be empty, clear regions, set other values to defaults and set initial font and color.
+     * @param font not null */
+    public void init(F font, float color) {
         if (font == null) throw new NullPointerException("font");
-        this.text = text;
-        this.length = MathUtils.clamp(length, 0, text.length);
+        reset();
         this.initialFont = font;
         this.initialColor = color;
-        this.tabStopPositions = tabStopPositions;
-        this.leftToRight = leftToRight;
-        this.locale = locale;
+    }
 
-        regionStarts.clear();
-        regionFonts.clear();
-        regionColors.clear();
+    /** Set the characters of the text.
+     * @param chars not null (may be null only if length is 0)
+     * @param length of chars to use, in range [0, chars.length] */
+    public void setText(char[] chars, int length) {
+        if (length == 0) {
+            this.text = NO_TEXT;
+            this.length = 0;
+            return;
+        }
+        if (chars == null) throw new NullPointerException("chars");
+        if (length < 0 || length > chars.length) throw new IllegalArgumentException("length = "+length+", must be in [0,"+chars.length+']');
+        this.text = chars;
+        this.length = length;
+    }
+
+    /** Set the text to whatever are the current characters of the string builder.
+     * State of characters is undefined after any modifications are done to the string builder.
+     * @param stringBuilder not null */
+    public void setText(StringBuilder stringBuilder) {
+        setText(stringBuilder.chars, stringBuilder.length);
+    }
+
+    /** Set the text to the content of given string.
+     * <b>NOTE: This method causes an allocation. If you plan to modify the text often, use one of the other overloads.</b>
+     * @param string may be null for empty test */
+    public void setText(String string) {
+        final int length = string == null ? 0 : string.length();
+        this.text = length == 0 ? NO_TEXT : string.toCharArray();
+        this.length = length;
     }
 
     /**
      * Adds a region into the text, which spans from the given start to the end of the text, or the start of another region.
-     * Must be {@link #init}'d first.
+     * Regions can be added in arbitrary order, but the code is optimized for adding in order, from smallest start indexes.
+     * Adding region with same start index twice will overwrite previously added region.
      *
-     * @param start of the region (first char will be <code>text[textStart + start]</code>)
+     * @param start of the region (first affected char will be <code>text[start]</code>), must be >= 0
      * @param font to use in this region, not null
      * @param color of the region (see {@link Color#toFloatBits()})
      */
-    public void addRegion(int start, Font font, float color) {
-        if (this.text == null) throw new IllegalStateException("Not initialized.");
+    public void addRegion(int start, F font, float color) {
         if (font == null) throw new NullPointerException("font");
 
         if (start < 0) {
             // Clamp
             start = 0;
-        } else if (start >= length) {
-            // This will never apply
-            return;
         }
 
         final IntArray regionStarts = this.regionStarts;
-        final Array<Font> regionFonts = this.regionFonts;
+        final Array<F> regionFonts = this.regionFonts;
         final FloatArray regionColors = this.regionColors;
 
         int regionCount = regionStarts.size;
@@ -127,14 +136,28 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         }
     }
 
+    /**
+     * Removes all previously added regions.
+     */
+    public void removeAllRegions() {
+        regionStarts.clear();
+        regionFonts.clear();
+        regionColors.clear();
+    }
+
+    /** @return characters of the text, not null
+     * @see #length() for the valid range */
     public char[] text() {
         return this.text;
     }
 
+    /** @return number of valid indices from the start of {@link #text()}, i.e. length of the text. */
     public int length() {
         return this.length;
     }
 
+    /** @param index into the text, may be out of bounds
+     * @return color to be used at given character index */
     public float colorAt(int index) {
         final IntArray regionStarts = this.regionStarts;
         final int regionCount = regionStarts.size;
@@ -153,7 +176,9 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         }
     }
 
-    public Font fontAt(int index) {
+    /** @param index into the text, may be out of bounds
+     * @return font to be used at given character index */
+    public F fontAt(int index) {
         final IntArray regionStarts = this.regionStarts;
         final int regionCount = regionStarts.size;
         final int[] regionStartsItems = regionStarts.items;
@@ -171,12 +196,18 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         }
     }
 
-    /**
-     * Find index of tab stop which belongs to the text found at given x.
-     * Returns valid index for {@link #tabStopOffsetFor}, or -1 when there are no more tab stops on this line.
+    /** Set the positions of tab stops. Must be sorted from leftmost to rightmost. Not copied, only reference held.
+     * Note that these positions give meaningful results only in left-aligned text (even for RTL scripts).
+     * @param tabStopPositions may be null */
+    public void setTabStopPositions(float[] tabStopPositions) {
+        this.tabStopPositions = tabStopPositions;
+    }
+
+    /** Find index of tab stop which belongs to the text found at given x.
+     * Returns valid index for {@link #tabStopOffsetFor(int, float)}, or -1 when there are no more tab stops on this line.
      * In that case, it can either overflow to next line and tab stop of 0 should be used (complex behavior),
      * or it can ignore the tab stop completely.
-     */
+     * @param defaultTabAdvance see {@link #tabStopOffsetFor(int, float)} */
     public int tabStopIndexFor(float x, float defaultTabAdvance) {
         final float[] tabPoints = this.tabStopPositions;
         if (tabPoints == null) {
@@ -201,6 +232,10 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         }
     }
 
+    /** Find X offset, from the start of the line, for the index of the tab stop, as returned by
+     * {@link #tabStopIndexFor(float, float)}.
+     * @param defaultTabAdvance to use when there are no tab stop points defined.
+     *                          Usually derived as 8×space width of initial font. */
     public float tabStopOffsetFor(int index, float defaultTabAdvance) {
         final float[] tabPoints = this.tabStopPositions;
         if (tabPoints == null) {
@@ -219,6 +254,59 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         return tabPoints[index];
     }
 
+    /** Initial font used for text that is not covered by any region.
+     * Initial font and color applies to the ellipsis, if the laid out text has any, so it is valid to cover
+     * the entire text by region with actual font+color and use initial font+color only for ellipsis. */
+    public F getInitialFont() {
+        return initialFont;
+    }
+
+    /** Initial color used for text that is not covered by any region.
+     * @see #getInitialFont() */
+    public float getInitialColor() {
+        return initialColor;
+    }
+
+    /** @see #isLeftToRight() */
+    public void setLeftToRight(boolean leftToRight) {
+        this.leftToRight = leftToRight;
+    }
+
+    /** true if bidi paragraph direction is left to right, false if right to left.
+     * This only has effect on mixed directionality text.
+     * <i>Default: true</i> */
+    public boolean isLeftToRight() {
+        return leftToRight;
+    }
+
+    /** @see #getLocale() */
+    public void setLocale(Locale locale) {
+        this.locale = locale;
+    }
+
+    /** Locale used for locale specific things when laying out the text,
+     * such as line breaking. If no locale specific behavior is needed, set to null to use english-like optimized defaults.
+     * <i>Default: null</i> */
+    public Locale getLocale() {
+        return locale;
+    }
+
+    @Override
+    public void reset() {
+        text = NO_TEXT;
+        length = 0;
+        initialFont = null;
+        initialColor = 0f;
+
+        regionStarts.clear();
+        regionFonts.clear();
+        regionColors.clear();
+
+        tabStopPositions = null;
+        leftToRight = true;
+        locale = null;
+    }
+
     int regionAt(int index) {
         int i = Arrays.binarySearch(regionStarts.items, 0, regionStarts.size, index);
         if (i >= 0) {
@@ -226,36 +314,4 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         }
         return -i - 2;
     }
-
-    public boolean isLeftToRight() {
-        return leftToRight;
-    }
-
-    public Font initialFont() {
-        return initialFont;
-    }
-
-    public float initialColor() {
-        return initialColor;
-    }
-
-    public Locale locale() {
-        return locale;
-    }
-
-    /**
-     * Clear all properties, including text, base properties and all regions.
-     * Does not need to be called before {@link #init}, call only to prevent memory leaks.
-     */
-    public void reset() {
-        text = null;
-        initialFont = null;
-        regionStarts.clear();
-        regionFonts.clear();
-        regionColors.clear();
-        tabStopPositions = null;
-        leftToRight = true;
-        locale = null;
-    }
-
 }

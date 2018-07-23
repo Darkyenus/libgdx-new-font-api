@@ -1,4 +1,4 @@
-package com.badlogic.gdx.graphics.text;
+package com.badlogic.gdx.graphics.text.util;
 
 import java.text.CharacterIterator;
 

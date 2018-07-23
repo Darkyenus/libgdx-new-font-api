@@ -16,7 +16,7 @@ import java.util.Iterator;
  *     <li>Presence of <code>\n</code> or <code>\t</code></li>
  * </ul>
  */
-public final class LayoutTextRunIterable<F extends Font> implements Iterable<LayoutTextRunIterable.TextRun<F>>, Pool.Poolable {
+public final class LayoutTextRunIterable<F extends Font<F>> implements Iterable<LayoutTextRunIterable.TextRun<F>>, Pool.Poolable {
 
     private final Array<TextRun<F>> textRuns = new Array<>(true, 10, TextRun.class);
 
@@ -24,7 +24,7 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
      * Must be freed after use by {@link LayoutTextRunIterable#free(LayoutTextRunIterable)}.
      *
      * @param text to iterate through */
-    public static <F extends Font> LayoutTextRunIterable<F> obtain(LayoutText<F> text) {
+    public static <F extends Font<F>> LayoutTextRunIterable<F> obtain(LayoutText<F> text) {
         @SuppressWarnings("unchecked")
         final LayoutTextRunIterable<F> iterable = ITERABLE_POOL.obtain();
         iterable.setup(text);
@@ -32,7 +32,7 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
     }
 
     /** Free the given iterable. Do not use it after freeing. */
-    public static <F extends Font> void free(LayoutTextRunIterable<F> iterable) {
+    public static <F extends Font<F>> void free(LayoutTextRunIterable<F> iterable) {
         ITERABLE_POOL.free(iterable);
     }
 
@@ -263,7 +263,7 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
         assert assertLayoutRunsValid(textRuns);
     }
 
-    private static <F extends Font> int regionEndIndex(LayoutText<F> text, int currentRegion) {
+    private static <F extends Font<F>> int regionEndIndex(LayoutText<F> text, int currentRegion) {
         final IntArray regionStarts = text.regionStarts;
         if (currentRegion + 1 >= regionStarts.size) {
             return text.length;
@@ -272,7 +272,7 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
         }
     }
 
-    private static <F extends Font> boolean assertLayoutRunsValid(Array<TextRun<F>> runs) {
+    private static <F extends Font<F>> boolean assertLayoutRunsValid(Array<TextRun<F>> runs) {
         for (TextRun run : runs) {
             assert run.start >= 0;
             assert run.start < run.end;
@@ -316,7 +316,7 @@ public final class LayoutTextRunIterable<F extends Font> implements Iterable<Lay
     /**
      * Continuous range of characters in original text with the same properties.
      */
-    public static final class TextRun<F extends Font> implements Pool.Poolable {
+    public static final class TextRun<F extends Font<F>> implements Pool.Poolable {
         /** This run consists solely of a linebreak sequence. Next run will be on a new line, relative to this run. (Current run is \n, \r, or \r\n) */
         public static final int FLAG_LINE_BREAK = 1;
         /** This run consists solely of a tab stop. (Current run is \t) */
