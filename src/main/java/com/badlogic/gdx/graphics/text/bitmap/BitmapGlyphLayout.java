@@ -25,7 +25,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
     private float startX;
 
     private void addLineHeight(float height) {
-        lineHeights.add(height() + height);
+        lineHeights.add(getHeight() + height);
     }
 
     private void addLinebreakRunFor(final TextRun<BitmapFont> textRun, final int line) {
@@ -320,7 +320,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         }
 
         final int line = lineHeights.size;
-        final float lineStartY = -height();
+        final float lineStartY = -getHeight();
 
         // Shift each run so that it shares common baseline with all fonts on line
         GlyphRun<BitmapFont> run;
@@ -484,24 +484,10 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
     }
 
     @Override
-    public void layoutText(LayoutText<BitmapFont> text, float availableWidth, float availableHeight, int horizontalAlign, String ellipsis) {
-        clear();
-        final Array<BitmapFont> fonts = _fonts;
-        fonts.clear();
-
-        if (availableWidth <= 0) {
-            availableWidth = Float.POSITIVE_INFINITY;
-        }
-        int maxLines = Integer.MAX_VALUE;
-        if (availableHeight == 0f) {
-            availableHeight = Float.POSITIVE_INFINITY;
-        } else if (availableHeight < 0f) {
-            maxLines = Math.max(Math.round(-availableHeight), 1);
-            availableHeight = Float.POSITIVE_INFINITY;
-        }
-
-        final char[] chars = text.text();
+    protected void doLayoutText(LayoutText<BitmapFont> text, float availableWidth, float availableHeight, int maxLines, String ellipsis) {
         final Array<GlyphRun<BitmapFont>> runs = this.runs;
+        final Array<BitmapFont> fonts = _fonts;
+        final char[] chars = text.text();
 
         int line = 0;
         int lineLaidRuns = 0;
@@ -621,7 +607,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                 }
 
                 // Check vertical limits
-                if (line > 0 && height() > availableHeight) {
+                if (line > 0 && getHeight() > availableHeight) {
                     // The line we just completed is too high and will be scrapped, with previous line ellipsized
                     clampLines = true;
                     break forTextRuns;
@@ -638,7 +624,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                 lineLaidRuns = runs.size;
 
                 // Check vertical limits
-                if (line > 0 && height() > availableHeight) {
+                if (line > 0 && getHeight() > availableHeight) {
                     // This line is too high, it will be discarded
                     clampLines = true;
                     break;
@@ -660,7 +646,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                     addLineHeight(textRun.font.lineHeight);
 
                     // This definitely leads on to the non-first line. Check if it still fits height requirements.
-                    if (height() > availableHeight) {
+                    if (getHeight() > availableHeight) {
                         clampLines = true;
                         break;
                     }
@@ -672,7 +658,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             final FloatArray lineHeights = this.lineHeights;
 
             // Discard any line information about the last line or any following lines
-            if (height() > availableHeight) {
+            if (getHeight() > availableHeight) {
                 // Convert to max lines problem
                 // Remove lines that overflow
                 while (lineHeights.size > 0 && lineHeights.items[lineHeights.size-1] > availableHeight) {
@@ -795,13 +781,12 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             // At least one line must be always present, even if there is no text run
             addLineHeight(text.fontAt(0).lineHeight);
         }
-
-        buildCharPositions();
     }
 
     @Override
     public void clear() {
         super.clear();
+        _fonts.clear();
         startX = 0f;
     }
 

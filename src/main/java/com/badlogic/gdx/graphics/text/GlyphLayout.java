@@ -1,27 +1,28 @@
 package com.badlogic.gdx.graphics.text;
 
 import com.badlogic.gdx.math.Rectangle;
-import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.utils.FloatArray;
-import com.badlogic.gdx.utils.FlushablePool;
-import com.badlogic.gdx.utils.IntArray;
+import com.badlogic.gdx.utils.*;
 
 import java.util.Arrays;
 
 /** Class responsible for laying out the glyphs constructed from fonts of this font system.
  * Also stores the laid out glyphs. */
-public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Font> {
+public abstract class GlyphLayout<F extends Font<F>> {
 
     /** Runs of the layout. Ordered by lines and then by X coordinate (not by char positions).
      * Some runs may not contain any glyphs and serve just to specify which (non-rendered) glyphs are on which line. */
-    protected final Array<GlyphRun<Font>> runs = new Array<>(GlyphRun.class);
-    /** Value exposed by {@link #width()}. */
+    protected final Array<GlyphRun<F>> runs = new Array<>(GlyphRun.class);
+    /** @see #getWidth() */
     private float width;
+    /** @see #getAlignWidth() */
+    private float alignWidth;
+    /** Current horizontal alignment of the laid text. */
+    private int horizontalAlign = Align.left;
     /** Contains run character start index (msb 17bits, msb bit 0) with index of run which contains it (lsb 15bits).
      * Ordered for quick binary search of character->run mapping. */
     private final IntArray charRuns = new IntArray();
     /** For each line in the layout (even if it has no GlyphRun), contains its height + <b>height of all previous lines</b>.
-     * Size determines the amount of lines. Must have at least one entry. Determines {@link #height()}. */
+     * Size determines the amount of lines. Must have at least one entry. Determines {@link #getHeight()}. */
     protected final FloatArray lineHeights = new FloatArray();
 
     /** Sets this text layout to contain specified text, laid out in a virtual rectangle
@@ -29,9 +30,6 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
      *
      * Then, the text is aligned according to horizontalAlign in that rectangle.
      * (If availableWidth is infinite, alignment is computed with respect to the maximal width of all laid out lines.)
-     *
-     * Should set values of {@link #runs}, {@link #width}, {@link #height} and {@link #lineHeights}.
-     * When layout is done, it should also call {@link #buildCharPositions()}.
      *
      * @param text to lay out (may be modified after this call is done, it will not reflect in the layout)
      * @param availableWidth to which the text must fit. Values <= 0 are same as {@link Float#POSITIVE_INFINITY}
@@ -42,31 +40,116 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
      * @param ellipsis to use when the text is too long and doesn't fit available space. Will be rendered using
      *                the {@link LayoutText#initialFont} and {@link LayoutText#initialColor} of the text.
      *                May be null, in which case no ellipsis is used. */
-    public abstract void layoutText(LayoutText<Font> text, float availableWidth, float availableHeight, int horizontalAlign, String ellipsis);
+    public void layoutText(LayoutText<F> text, float availableWidth, float availableHeight, int horizontalAlign, String ellipsis) {
+        if (text == null) throw new NullPointerException("text");
+        clear();
 
-    protected final void buildCharPositions() {
+        if (availableWidth <= 0) {
+            availableWidth = Float.POSITIVE_INFINITY;
+        }
+        int maxLines = Integer.MAX_VALUE;
+        if (availableHeight == 0f) {
+            availableHeight = Float.POSITIVE_INFINITY;
+        } else if (availableHeight < 0f) {
+            maxLines = Math.max(Math.round(-availableHeight), 1);
+            availableHeight = Float.POSITIVE_INFINITY;
+        }
+
+        if (ellipsis == null) {
+            ellipsis = "";
+        }
+
+        doLayoutText(text, availableWidth, availableHeight, maxLines, ellipsis);
+
+        // Build charRuns and layout width
         final IntArray charRuns = this.charRuns;
-
+        final GlyphRun<F>[] glyphRuns = this.runs.items;
+        final int runCount = this.runs.size;
         float width = 0f;
 
-        final GlyphRun<Font>[] glyphRuns = this.runs.items;
-        final int runCount = this.runs.size;
         assert (runCount & ~0x7FFF) == 0;
 
         for (int i = 0; i < runCount; i++) {
-            final GlyphRun<Font> run = glyphRuns[i];
+            final GlyphRun<F> run = glyphRuns[i];
             width = Math.max(width, run.x + run.getDrawWidth());
-            if (run.isEllipsis()) {
-                continue;
+            if (!run.isEllipsis()) {
+                assert (run.charactersStart & ~0xFFFF) == 0;
+                charRuns.add(run.charactersStart << 15 | i);
             }
-            assert (run.charactersStart & ~0xFFFF) == 0;
-            charRuns.add(run.charactersStart << 15 | i);
         }
-
-        this.width = width;
         charRuns.sort();
         assert assertCharRunsValid(charRuns);
+
+        if ((horizontalAlign & Align.left) != 0) {
+            // Aligned left
+            this.width = this.alignWidth = width;
+            this.horizontalAlign = Align.left;
+        } else {
+            // Aligned center or right
+            final boolean alignCenter = (horizontalAlign & Align.right) == 0;
+            this.horizontalAlign = alignCenter ? Align.center : Align.right;
+
+            final float alignToWidth = availableWidth == Float.POSITIVE_INFINITY ? width : availableWidth;
+            int lineStartRun = 0;
+            int line = 0;
+            for (int i = 0; i < runCount; i++) {
+                final GlyphRun<F> run = glyphRuns[i];
+
+                if (run.line > line) {
+                    // Align lines
+                    alignLineRuns(glyphRuns, lineStartRun, i, alignCenter, alignToWidth);
+                    line = run.line;
+                    lineStartRun = i;
+                }
+            }
+            alignLineRuns(glyphRuns, lineStartRun, runCount, alignCenter, alignToWidth);
+
+            this.alignWidth = alignToWidth;
+            if (alignCenter) {
+                this.width = (alignToWidth + width) / 2f;
+            } else {
+                this.width = alignToWidth;
+            }
+        }
     }
+
+    private static <F extends Font<F>> void alignLineRuns(GlyphRun<F>[] runs, int lineStartRun, int lineEndRun, boolean alignCenter, float alignToWidth) {
+        if (lineStartRun >= lineEndRun) return;
+
+        final float offset;
+        {
+            final GlyphRun<F> lastRun = runs[lineEndRun - 1];
+            final float lineWidth = lastRun.x + lastRun.getDrawWidth();
+
+            if (alignCenter) {
+                offset = (alignToWidth - lineWidth) / 2f;
+            } else {
+                // align right
+                offset = alignToWidth - lineWidth;
+            }
+        }
+
+        if (offset <= 0f) {
+            // This line is already properly aligned
+            return;
+        }
+
+        for (int i = lineStartRun; i < lineEndRun; i++) {
+            runs[i].x += offset;
+        }
+    }
+
+    /**
+     * Do internal layout. Align runs to the left, real align is done later.
+     * Should set values of {@link #runs} and {@link #lineHeights}.
+     *
+     * @param text not null
+     * @param availableWidth positive, possibly infinity
+     * @param availableHeight positive, possibly infinity
+     * @param maxLines positive, possibly {@link Integer#MAX_VALUE}
+     * @param ellipsis never null, possibly empty
+     */
+    protected abstract void doLayoutText(LayoutText<F> text, float availableWidth, float availableHeight, int maxLines, String ellipsis);
 
     private boolean assertCharRunsValid(IntArray charRuns) {
         int lastCharStart = -1;
@@ -91,7 +174,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
     protected final int indexOfRunOf(int characterIndex, boolean closest) {
         final int[] charRunItems = charRuns.items;
         final int charRunCount = charRuns.size;
-        final Array<GlyphRun<Font>> runs = this.runs;
+        final Array<GlyphRun<F>> runs = this.runs;
 
         if ((characterIndex & ~0xFFFF) != 0 || charRunCount <= 0) {
             // characterIndex is out of supported bounds or there are no runs
@@ -119,7 +202,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
             }
             runIndex = charRunItems[baseIndex] & 0x7FFF;
         }
-        final GlyphRun<Font> run = runs.items[runIndex];
+        final GlyphRun<F> run = runs.items[runIndex];
         assert run.charactersStart <= characterIndex;
         if (run.charactersEnd > characterIndex) {
             return runIndex;
@@ -128,12 +211,17 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
     }
 
     /** @return total width of the currently laid out text */
-    public final float width() {
+    public final float getWidth() {
         return width;
     }
 
+    /** @return width to which the text is horizontally aligned to */
+    public final float getAlignWidth() {
+        return alignWidth;
+    }
+
     /** @return total height of the currently laid out text */
-    public final float height() {
+    public final float getHeight() {
         FloatArray lineHeights = this.lineHeights;
         int lastIndex = lineHeights.size - 1;
         if (lastIndex < 0) {
@@ -141,6 +229,10 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
         } else {
             return lineHeights.items[lastIndex];
         }
+    }
+
+    public final int getHorizontalAlign() {
+        return horizontalAlign;
     }
 
     private static final FlushablePool<Rectangle> SELECTION_POOL = new FlushablePool<Rectangle>(3, 16){
@@ -152,13 +244,21 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
 
     /** @see #getCaretPosition(int) */
     private Rectangle getCaretPosition(int index, Rectangle caret) {
-        final Array<GlyphRun<Font>> runs = this.runs;
+        final Array<GlyphRun<F>> runs = this.runs;
         if (runs.size == 0) {
-            //TODO Consider align? width is probably 0...
-            return caret.set(0f, -lineHeights.items[0], 0f, lineHeights.items[0]);
+            caret.set(0f, -lineHeights.items[0], 0f, lineHeights.items[0]);
+            switch (horizontalAlign) {
+                case Align.center:
+                    caret.x = alignWidth / 2f;
+                    break;
+                case Align.right:
+                    caret.x = alignWidth;
+                    break;
+            }
+            return caret;
         }
         final int runIndex = indexOfRunOf(index, true);
-        final GlyphRun<Font> run = runs.items[runIndex];
+        final GlyphRun<F> run = runs.items[runIndex];
         final int line = run.line;
         final float y = -lineHeights.items[line];
         final float height = -y - (line == 0 ? 0 : lineHeights.items[line-1]);
@@ -175,8 +275,16 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
                 assert line + 1 <= lineHeights.size;
                 final float nY = -lineHeights.items[line+1];
                 final float nHeight = -nY - lineHeights.items[line];
-                //TODO Consider align
-                return caret.set(0f, nY, 0f, nHeight);
+                caret.set(0f, nY, 0f, nHeight);
+                switch (horizontalAlign) {
+                    case Align.center:
+                        caret.x = alignWidth / 2f;
+                        break;
+                    case Align.right:
+                        caret.x = alignWidth;
+                        break;
+                }
+                return caret;
             }
 
             if (run.isLtr()) {
@@ -223,13 +331,13 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
      */
     public final int getIndexAfterEditOffset(int characterIndex, int offset) {
         //TODO Test this
-        Array<GlyphRun<Font>> runs = this.runs;
+        Array<GlyphRun<F>> runs = this.runs;
         if (runs.size == 0) {
             return 0;
         }
 
         int runIndex = indexOfRunOf(characterIndex, true);
-        GlyphRun<Font> run = runs.items[runIndex];
+        GlyphRun<F> run = runs.items[runIndex];
         if (characterIndex < run.charactersStart) {
             characterIndex = run.charactersStart;
         } else if (characterIndex > run.charactersEnd) {
@@ -285,7 +393,7 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
      * @return index into the laid out text or -1 when no such glyph and clamp is false or when there is no text laid out
      */
     public final int getIndexAt(float x, float y, boolean closest) {
-        final Array<GlyphRun<Font>> runs = this.runs;
+        final Array<GlyphRun<F>> runs = this.runs;
         if (runs.size == 0) {
             return -1;
         }
@@ -314,10 +422,10 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
         }
 
         // Find run
-        final GlyphRun<Font>[] glyphRuns = runs.items;
-        GlyphRun<Font> lastRun = runs.items[0];
+        final GlyphRun<F>[] glyphRuns = runs.items;
+        GlyphRun<F> lastRun = runs.items[0];
         for (int i = 0; i < runs.size; i++) {
-            final GlyphRun<Font> run = glyphRuns[i];
+            final GlyphRun<F> run = glyphRuns[i];
             if (run.line > line) {
                 break;
             }
@@ -396,8 +504,9 @@ public abstract class GlyphLayout<Font extends com.badlogic.gdx.graphics.text.Fo
     @SuppressWarnings("unchecked")
     public void clear() {
         width = 0f;
+        horizontalAlign = Align.left;
 
-        GlyphRun.<Font>pool().freeAll(runs);
+        GlyphRun.<F>pool().freeAll(runs);
         runs.clear();
         charRuns.clear();
         lineHeights.clear();

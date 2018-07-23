@@ -106,6 +106,7 @@ and ellipsis truncation.
 	- Line wrapping & dimension limits
 	- Ellipsis
 	- Tab stops
+	- Horizontal align
 - HarfBuzz bindings
 - Text editing introspection
 	- "where should caret go when it is at this index?"

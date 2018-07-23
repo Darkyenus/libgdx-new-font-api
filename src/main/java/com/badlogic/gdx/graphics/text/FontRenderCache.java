@@ -108,7 +108,7 @@ public class FontRenderCache {
      * @param x of the upper left corner at which text should be rendered to
      * @param y of the upper left corner at which text should be rendered to
      */
-    public <F extends Font> void addGlyphs(GlyphLayout<F> glyphLayout, float x, float y) {
+    public <F extends Font<F>> void addGlyphs(GlyphLayout<F> glyphLayout, float x, float y) {
         Font lastFont = null;
         FloatArray[] pageVertices = null;
 

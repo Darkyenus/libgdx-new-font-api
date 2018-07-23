@@ -44,7 +44,7 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
      * Contains unit-based positions of <a href="https://en.wikipedia.org/wiki/Tab_stop">(left) tab stops</a>.
      * May be null, in which case, default spacing is used.
      */
-    private float[] tabPoints = null;
+    private float[] tabStopPositions = null;
 
     /**
      * Initialize base attributes.
@@ -53,22 +53,22 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
      * @param length of text to use
      * @param font initial font to use on the text
      * @param color initial color to use on the text (from {@link Color#toFloatBits()})
-     * @param tabPoints may be null, contains unit-based positions of tab stops. Must be sorted from leftmost to rightmost.
-     *                  Not copied, only reference held.
+     * @param tabStopPositions may be null, contains unit-based positions of tab stops. Must be sorted from leftmost to rightmost.
+     *                         Not copied, only reference held. Note that these positions give meaningful results only in left-aligned text (even for RTL scripts).
      * @param leftToRight if true, text is considered left-to-right. If false, right-to-left.
      * @param locale to use when manipulating this text. Used, for example, when determining line-breaks.
      *               Use null to fall back to optimized algorithms for latin-like text.
-     * @throws NullPointerException text or font is null, or when tabPoints is null and tabTypes isn't or vice-versa
-     * @throws IllegalArgumentException when tabPoints has different size than tabTypes
+     * @throws NullPointerException text or font is null, or when tabStopPositions is null and tabTypes isn't or vice-versa
+     * @throws IllegalArgumentException when tabStopPositions has different size than tabTypes
      */
-    public void init(char[] text, int length, Font font, float color, float[] tabPoints, boolean leftToRight, Locale locale) {
+    public void init(char[] text, int length, Font font, float color, float[] tabStopPositions, boolean leftToRight, Locale locale) {
         if (text == null) throw new NullPointerException("text");
         if (font == null) throw new NullPointerException("font");
         this.text = text;
         this.length = MathUtils.clamp(length, 0, text.length);
         this.initialFont = font;
         this.initialColor = color;
-        this.tabPoints = tabPoints;
+        this.tabStopPositions = tabStopPositions;
         this.leftToRight = leftToRight;
         this.locale = locale;
 
@@ -178,7 +178,7 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
      * or it can ignore the tab stop completely.
      */
     public int tabStopIndexFor(float x, float defaultTabAdvance) {
-        final float[] tabPoints = this.tabPoints;
+        final float[] tabPoints = this.tabStopPositions;
         if (tabPoints == null) {
             final int index = (int) Math.floor(x / defaultTabAdvance) + 1;
             if (index < 0) {
@@ -202,7 +202,7 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
     }
 
     public float tabStopOffsetFor(int index, float defaultTabAdvance) {
-        final float[] tabPoints = this.tabPoints;
+        final float[] tabPoints = this.tabStopPositions;
         if (tabPoints == null) {
             return index * defaultTabAdvance;
         }
@@ -253,7 +253,7 @@ public final class LayoutText<Font extends com.badlogic.gdx.graphics.text.Font> 
         regionStarts.clear();
         regionFonts.clear();
         regionColors.clear();
-        tabPoints = null;
+        tabStopPositions = null;
         leftToRight = true;
         locale = null;
     }

@@ -20,9 +20,9 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
     - TODO Stuff for editors (TextField...)
      */
 
+
     @Override
-    public void layoutText(LayoutText<HBFont> text, float availableWidth, float availableHeight, int horizontalAlign, String ellipsis) {
-        clear();
+    protected void doLayoutText(LayoutText<HBFont> text, float availableWidth, float availableHeight, int maxLines, String ellipsis) {
         final int length = text.length();
         if (length <= 0) {
             return;
@@ -108,6 +108,5 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
 
         shapeBuffer.destroy();
     }
-
 
 }

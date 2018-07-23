@@ -10,6 +10,7 @@ import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeType;
 import com.badlogic.gdx.graphics.text.FontRenderCache;
@@ -140,6 +141,15 @@ public class HarfBuzzTest {
         final Lwjgl3ApplicationConfiguration conf = new Lwjgl3ApplicationConfiguration();
         new Lwjgl3Application(new ApplicationAdapter(){
 
+            /*
+            Controls:
+            Letters + backspace = typing text
+            F1 = benchmark (hold)
+            F2 = toggle base text LTR/RTL
+            F3 = cycle horizontal align
+            F4 = delete all text
+             */
+
             ScreenViewport viewport = new ScreenViewport();
             SpriteBatch batch;
             FontRenderCache cache;
@@ -150,11 +160,17 @@ public class HarfBuzzTest {
 
             Texture white;
 
+            com.badlogic.gdx.graphics.g2d.BitmapFont legacyBitmapFont;
+            GlyphLayout legacyGlyphLayout;
+
+
             final Vector2 mouse = new Vector2();
 
             boolean leftToRight = true;
 
             int caretIndex = 0;
+
+            int align = Align.left;
 
             @Override
             public void create() {
@@ -168,6 +184,10 @@ public class HarfBuzzTest {
                 fontItalic = BitmapFontSystem.INSTANCE.createFont(
                         Gdx.files.local("test-fonts/some-time-later/some-time-later-italic64.fnt"), 2f, null);
 
+                legacyBitmapFont = new com.badlogic.gdx.graphics.g2d.BitmapFont(Gdx.files.local("test-fonts/some-time-later/some-time-later-regular64.fnt"));
+                legacyBitmapFont.getData().scale(0.5f);
+                legacyGlyphLayout = new GlyphLayout();
+
                 layout = BitmapFontSystem.INSTANCE.createGlyphLayout();
 
                 text = new LayoutText<>();
@@ -178,8 +198,8 @@ public class HarfBuzzTest {
                 white = new Texture(pixmap);
 
 
-                sb.append("Hello world, WHY,\nVAVAW % Ø");
                 if (false)
+                sb.append("Hello world, WHY,\nVAVAW % Ø");
                 sb.append("Curabitur vel magna dui. Curabitur ac enim cursus, congue sapien in, tempor massa. Donec vitae tristique magna. Fusce dignissim nisl ut hendrerit vulputate. Aliquam quis magna molestie, feugiat neque sed, commodo justo. Pellentesque in posuere elit. Nullam vitae blandit ligula. Integer malesuada ornare urna, vitae fringilla metus fringilla sed. Vestibulum at leo risus. Morbi vehicula sodales arcu vel gravida. Aenean tempor ipsum non tincidunt vehicula. Etiam tincidunt leo ante, quis iaculis libero luctus non.\n" +
                         "\n" +
                         "Aliquam porttitor sed enim at viverra. Proin quis egestas neque. Sed lectus enim, tempor et sapien vel, varius molestie elit. Aliquam luctus ante in efficitur auctor. Integer et erat pharetra, ultricies nisl ut, bibendum mi. Integer molestie felis eu aliquet maximus. Vestibulum tristique efficitur turpis in ornare. Etiam pretium tincidunt sapien, sit amet facilisis nulla lacinia sed.\n" +
@@ -249,6 +269,19 @@ public class HarfBuzzTest {
                 if (Gdx.input.isKeyJustPressed(Input.Keys.F2)) {
                     leftToRight = !leftToRight;
                 }
+                if (Gdx.input.isKeyJustPressed(Input.Keys.F3)) {
+                    if (align == Align.left) {
+                        align = Align.center;
+                    } else if (align == Align.center) {
+                        align = Align.right;
+                    } else {
+                        align = Align.left;
+                    }
+                }
+                if (Gdx.input.isKeyJustPressed(Input.Keys.F4)) {
+                    sb.setLength(0);
+                    caretIndex = 0;
+                }
 
                 text.init(sb.chars, sb.length, font, Color.ROYAL.toFloatBits(), null, leftToRight, null);
                 //text.addRegion(5, fontItalic, Color.BLUE.toFloatBits());
@@ -263,25 +296,32 @@ public class HarfBuzzTest {
                 //text.addRegion(25, font, Color.BLACK.toFloatBits());
 
 
+                final float targetWidth = 300f;
                 layout.clear();
                 final long layoutStart = System.nanoTime();
                 for (int i = 0; i < 100; i++) {
-                    layout.layoutText(text, 300f, 300f, Align.left, "...");
+                    layout.layoutText(text, targetWidth, /*300f*/0f, align, "...");
                 }
                 final double duration = (System.nanoTime() - layoutStart) / 100_000_000.0;
                 if (Gdx.input.isKeyPressed(Input.Keys.F1)) {
-                    System.out.printf("%.3f ms\n", duration);
+
+                    final long legacyLayoutStart = System.nanoTime();
+                    for (int i = 0; i < 100; i++) {
+                        legacyGlyphLayout.setText(legacyBitmapFont, sb, Color.BLACK, targetWidth, align, true);
+                    }
+                    final double legacyLayoutDuration = (System.nanoTime() - legacyLayoutStart) / 100_000_000.0;
+                    System.out.printf("%.3f ms (legacy: %.3f ms)\n", duration, legacyLayoutDuration);
                 }
 
-                final float textX = Gdx.graphics.getWidth()/2f - layout.width()/2f;
-                final float textY = Gdx.graphics.getHeight()/2f + layout.height()/2f;
+                final float textX = Gdx.graphics.getWidth()/2f - layout.getAlignWidth()/2f;
+                final float textY = Gdx.graphics.getHeight()/2f + layout.getHeight()/2f;
                 cache.addGlyphs(layout, textX, textY);
 
                 batch.setProjectionMatrix(viewport.getCamera().combined);
                 batch.begin();
                 batch.enableBlending();
                 batch.setColor(1f, 1f, 1f, 1f);
-                batch.draw(white, textX, textY, layout.width(), -layout.height());
+                batch.draw(white, textX, textY, layout.getWidth(), -layout.getHeight());
                 cache.draw(batch);
 
                 //Caret
