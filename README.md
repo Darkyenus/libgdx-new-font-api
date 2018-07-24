@@ -1,5 +1,7 @@
 # LibGDX New Font API Experimentation
 
+![](demo/wikipedia-formatting.png)
+
 Directory layout:
 - `harfbuzz/`: installed harfbuzz (currently macOS binaries)
 - `harfbuzz-1.8.1/`: unmodified tarball release of harfbuzz (except for configuration)
@@ -112,6 +114,7 @@ and ellipsis truncation.
 	- "where should caret go when it is at this index?"
 	- "what character did I press when I clicked here?"
 	- "how it should move when I press LEFT/RIGHT/UP/DOWN arrow? And which characters to delete on DELETE or BACKSPACE?"
+- Markup to `LayoutText` converter
 
 ### ToDo
 - BitmapFontSystem
@@ -119,7 +122,6 @@ and ellipsis truncation.
 	- Fallback fonts
 - Text editing introspection
 	- "how should I render selection?"
-- Markup to `LayoutText` converter
 - API shortcuts for everyday use, where not all features are needed
 - HBFontSystem
 	- everything

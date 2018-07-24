@@ -22,8 +22,18 @@ import java.util.Locale;
  * When tab character is encountered, following text shifts to the closest tab stop at greater X position.
  * If there is no next stop defined, tab is ignored.
  * <p>By default, there is endless amount of stops 8-spaces apart.</p>
+ *
+ * <h4>Example</h4>
+ * <blockquote><pre>{@code
+ *     LayoutText<BitmapFont> text = new LayoutText<>();
+ *     text.init(myFont, Color.BLACK.toFloatBits());
+ *     text.setText("My text");
+ *     text.addRegion(3, myFont, Color.RED.toFloatBits());
+ * }</pre></blockquote>
+ *
+ * @see com.badlogic.gdx.graphics.text.util.MarkupLayoutText
  */
-public final class LayoutText<F extends Font<F>> implements Pool.Poolable {
+public class LayoutText<F extends Font<F>> implements Pool.Poolable {
 
     public static final char[] NO_TEXT = new char[0];
 
@@ -61,7 +71,7 @@ public final class LayoutText<F extends Font<F>> implements Pool.Poolable {
     /** Set the characters of the text.
      * @param chars not null (may be null only if length is 0)
      * @param length of chars to use, in range [0, chars.length] */
-    public void setText(char[] chars, int length) {
+    public final void setText(char[] chars, int length) {
         if (length == 0) {
             this.text = NO_TEXT;
             this.length = 0;
@@ -76,14 +86,14 @@ public final class LayoutText<F extends Font<F>> implements Pool.Poolable {
     /** Set the text to whatever are the current characters of the string builder.
      * State of characters is undefined after any modifications are done to the string builder.
      * @param stringBuilder not null */
-    public void setText(StringBuilder stringBuilder) {
+    public final void setText(StringBuilder stringBuilder) {
         setText(stringBuilder.chars, stringBuilder.length);
     }
 
     /** Set the text to the content of given string.
      * <b>NOTE: This method causes an allocation. If you plan to modify the text often, use one of the other overloads.</b>
      * @param string may be null for empty test */
-    public void setText(String string) {
+    public final void setText(String string) {
         final int length = string == null ? 0 : string.length();
         this.text = length == 0 ? NO_TEXT : string.toCharArray();
         this.length = length;
@@ -98,7 +108,7 @@ public final class LayoutText<F extends Font<F>> implements Pool.Poolable {
      * @param font to use in this region, not null
      * @param color of the region (see {@link Color#toFloatBits()})
      */
-    public void addRegion(int start, F font, float color) {
+    public final void addRegion(int start, F font, float color) {
         if (font == null) throw new NullPointerException("font");
 
         if (start < 0) {
@@ -139,7 +149,7 @@ public final class LayoutText<F extends Font<F>> implements Pool.Poolable {
     /**
      * Removes all previously added regions.
      */
-    public void removeAllRegions() {
+    public final void removeAllRegions() {
         regionStarts.clear();
         regionFonts.clear();
         regionColors.clear();
@@ -147,18 +157,18 @@ public final class LayoutText<F extends Font<F>> implements Pool.Poolable {
 
     /** @return characters of the text, not null
      * @see #length() for the valid range */
-    public char[] text() {
+    public final char[] text() {
         return this.text;
     }
 
     /** @return number of valid indices from the start of {@link #text()}, i.e. length of the text. */
-    public int length() {
+    public final int length() {
         return this.length;
     }
 
     /** @param index into the text, may be out of bounds
      * @return color to be used at given character index */
-    public float colorAt(int index) {
+    public final float colorAt(int index) {
         final IntArray regionStarts = this.regionStarts;
         final int regionCount = regionStarts.size;
         final int[] regionStartsItems = regionStarts.items;
@@ -178,7 +188,7 @@ public final class LayoutText<F extends Font<F>> implements Pool.Poolable {
 
     /** @param index into the text, may be out of bounds
      * @return font to be used at given character index */
-    public F fontAt(int index) {
+    public final F fontAt(int index) {
         final IntArray regionStarts = this.regionStarts;
         final int regionCount = regionStarts.size;
         final int[] regionStartsItems = regionStarts.items;
@@ -257,13 +267,13 @@ public final class LayoutText<F extends Font<F>> implements Pool.Poolable {
     /** Initial font used for text that is not covered by any region.
      * Initial font and color applies to the ellipsis, if the laid out text has any, so it is valid to cover
      * the entire text by region with actual font+color and use initial font+color only for ellipsis. */
-    public F getInitialFont() {
+    public final F getInitialFont() {
         return initialFont;
     }
 
     /** Initial color used for text that is not covered by any region.
      * @see #getInitialFont() */
-    public float getInitialColor() {
+    public final float getInitialColor() {
         return initialColor;
     }
 
@@ -275,7 +285,7 @@ public final class LayoutText<F extends Font<F>> implements Pool.Poolable {
     /** true if bidi paragraph direction is left to right, false if right to left.
      * This only has effect on mixed directionality text.
      * <i>Default: true</i> */
-    public boolean isLeftToRight() {
+    public final boolean isLeftToRight() {
         return leftToRight;
     }
 
@@ -287,7 +297,7 @@ public final class LayoutText<F extends Font<F>> implements Pool.Poolable {
     /** Locale used for locale specific things when laying out the text,
      * such as line breaking. If no locale specific behavior is needed, set to null to use english-like optimized defaults.
      * <i>Default: null</i> */
-    public Locale getLocale() {
+    public final Locale getLocale() {
         return locale;
     }
 
@@ -307,7 +317,7 @@ public final class LayoutText<F extends Font<F>> implements Pool.Poolable {
         locale = null;
     }
 
-    int regionAt(int index) {
+    final int regionAt(int index) {
         int i = Arrays.binarySearch(regionStarts.items, 0, regionStarts.size, index);
         if (i >= 0) {
             return i;

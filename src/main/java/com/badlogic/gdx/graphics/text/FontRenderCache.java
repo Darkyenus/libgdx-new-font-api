@@ -121,6 +121,7 @@ public class FontRenderCache {
             }
 
             final boolean flipMirrored = !run.isLtr();
+            final float color = run.color;
 
             final int glyphAmount = run.glyphs.size;
             final Glyph[] glyphs = run.glyphs.items;
@@ -156,7 +157,6 @@ public class FontRenderCache {
                 }
 
                 final float u = glyph.u, u2 = glyph.u2, v = glyph.v, v2 = glyph.v2;
-                final float color = run.color;
 
                 vertices[idx++] = gX;
                 vertices[idx++] = gY;

@@ -1,6 +1,7 @@
 package com.badlogic.gdx.graphics.text.bitmap;
 
 import com.badlogic.gdx.files.FileHandle;
+import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -37,7 +38,7 @@ public class BitmapFontSystem implements FontSystem<BitmapGlyphLayout> {
         final TextureRegion[] regions = new TextureRegion[pagePaths.length];
         final FileHandle parent = fnt.parent();
         for (int i = 0; i < pagePaths.length; i++) {
-            final Texture texture = new Texture(parent.child(pagePaths[i]));
+            final Texture texture = new Texture(parent.child(pagePaths[i]), Pixmap.Format.RGBA8888, false);
             regions[i] = new TextureRegion(texture);
         }
         font.loadPages(regions, true);
@@ -62,7 +63,7 @@ public class BitmapFontSystem implements FontSystem<BitmapGlyphLayout> {
         }
         final TextureRegion[] regions = new TextureRegion[pagePaths.length];
         for (int i = 0; i < pagePaths.length; i++) {
-            final Texture texture = new Texture(imageFiles[i]);
+            final Texture texture = new Texture(imageFiles[i], Pixmap.Format.RGBA8888, false);
             regions[i] = new TextureRegion(texture);
         }
         font.loadPages(regions, true);
