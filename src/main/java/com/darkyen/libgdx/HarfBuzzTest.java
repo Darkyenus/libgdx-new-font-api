@@ -302,7 +302,7 @@ public class HarfBuzzTest {
                 text.init(font, Color.ROYAL.toFloatBits());
                 text.style = textStyle;
                 text.setLeftToRight(leftToRight);
-                if (Gdx.input.isKeyPressed(Input.Keys.F5)) {
+                if (!Gdx.input.isKeyPressed(Input.Keys.F5)) {
                     text.setMarkupText(sb);
                 } else {
                     text.setText(sb);

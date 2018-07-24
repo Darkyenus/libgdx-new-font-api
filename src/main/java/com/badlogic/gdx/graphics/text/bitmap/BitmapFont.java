@@ -47,7 +47,7 @@ public class BitmapFont implements Font<BitmapFont> {
 
     /** Lazily created map of kerning data.
      * Key is 32 bits of first glyph, followed by 32 bits of second glyph. */
-    private LongMap<Byte> kerning = null;
+    private LongFloatMap kerning = null;
 
     /**
      * @param name of the font, for debug
@@ -62,7 +62,7 @@ public class BitmapFont implements Font<BitmapFont> {
         return ((long)first << 32) | (second & 0xFFFF_FFFFL);
     }
 
-    private void addKerning(int firstGlyph, int secondGlyph, int amount) {
+    private void addKerning(int firstGlyph, int secondGlyph, float amount) {
         if (amount == 0 || amount < Byte.MIN_VALUE || amount > Byte.MAX_VALUE) {
             // Retrieval assumes, that 0-amount kernings are not stored
             return;
@@ -74,33 +74,28 @@ public class BitmapFont implements Font<BitmapFont> {
             return;
         }
 
-        LongMap<Byte> kerning = this.kerning;
+        LongFloatMap kerning = this.kerning;
         if (kerning == null) {
-            kerning = this.kerning = new LongMap<>();
+            kerning = this.kerning = new LongFloatMap();
         }
         final long key = packKerning(firstGlyph, secondGlyph);
-        kerning.put(key, (byte) amount);
+        kerning.put(key, amount);
 
         leftGlyph.flags |= BitmapGlyph.FLAG_KERNING_LEFT;
         rightGlyph.flags |= BitmapGlyph.FLAG_KERNING_RIGHT;
     }
 
-    public int getKerning(BitmapGlyph firstGlyph, BitmapGlyph secondGlyph) {
+    public float getKerning(BitmapGlyph firstGlyph, BitmapGlyph secondGlyph) {
         if ((firstGlyph.flags & BitmapGlyph.FLAG_KERNING_LEFT) == 0 || (secondGlyph.flags & BitmapGlyph.FLAG_KERNING_RIGHT) == 0) {
             return 0;
         }
 
-        final LongMap<Byte> kerning = this.kerning;
+        final LongFloatMap kerning = this.kerning;
         if (kerning == null) {
             return 0;
         }
         final long key = packKerning(firstGlyph.glyphId, secondGlyph.glyphId);
-        final Byte amount = kerning.get(key);
-        if (amount == null) {
-            return 0;
-        } else {
-            return amount;
-        }
+        return kerning.get(key, 0f);
     }
 
     /**
@@ -248,7 +243,7 @@ public class BitmapFont implements Font<BitmapFont> {
                     if (kernCount > 0) {
                         if (kerning == null) {
                             // Probably still null, but just in case
-                            kerning = new LongMap<>(kernCount);
+                            kerning = new LongFloatMap(kernCount);
                         } else {
                             kerning.ensureCapacity(kernCount);
                         }
@@ -270,8 +265,7 @@ public class BitmapFont implements Font<BitmapFont> {
                 if (first < Character.MIN_CODE_POINT || first > Character.MAX_CODE_POINT
                         || second < Character.MIN_CODE_POINT || second > Character.MAX_CODE_POINT) continue;
                 tokens.nextToken();
-                int amount = parseInt(tokens.nextToken());
-                addKerning(first, second, amount);
+                addKerning(first, second, parseInt(tokens.nextToken()) * scale);
             }
 
             BitmapGlyph spaceGlyph = getGlyph(' ');
