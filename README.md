@@ -109,6 +109,7 @@ and ellipsis truncation.
 	- Ellipsis
 	- Tab stops
 	- Horizontal align
+	- Bidirectional text, according to BiDi algorithm, including character mirroring
 - HarfBuzz bindings
 - Text editing introspection
 	- "where should caret go when it is at this index?"

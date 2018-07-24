@@ -233,6 +233,10 @@ public class BitmapFont implements Font<BitmapFont> {
                         xOffset, base - yOffset - height,
                         width, height, xAdvance);
 
+                if (Character.isMirrored(glyphId)) {
+                    glyph.flags |= Glyph.FLAG_MIRRORED;
+                }
+
                 glyphs.put(glyphId, glyph);
             }
 
