@@ -71,6 +71,8 @@ public abstract class GlyphLayout<F extends Font<F>> {
 
         for (int i = 0; i < runCount; i++) {
             final GlyphRun<F> run = glyphRuns[i];
+            run.setCheckpointsEnabled(false);
+
             width = Math.max(width, run.x + run.getDrawWidth());
             if (!run.isEllipsis()) {
                 assert (run.charactersStart & ~0xFFFF) == 0;
@@ -142,6 +144,8 @@ public abstract class GlyphLayout<F extends Font<F>> {
     /**
      * Do internal layout. Align runs to the left, real align is done later.
      * Should set values of {@link #runs} and {@link #lineHeights}.
+     * Resulting runs may have {@link GlyphRun#checkpoints} enabled, they will be disabled by the caller
+     * (when they are presumably no longer needed).
      *
      * @param text not null
      * @param availableWidth positive, possibly infinity

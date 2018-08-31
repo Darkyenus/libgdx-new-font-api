@@ -2,7 +2,10 @@ package com.badlogic.gdx.graphics.text;
 
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.FloatArray;
+import com.badlogic.gdx.utils.LongArray;
 import com.badlogic.gdx.utils.Pool;
+
+import java.util.Arrays;
 
 /**
  * Contains laid out, colored text, along with some extra information to help {@link GlyphLayout}.
@@ -29,6 +32,17 @@ public final class GlyphRun<F extends Font<F>> implements Pool.Poolable {
     @SuppressWarnings("unchecked")
     public static <F extends Font<F>> Pool<GlyphRun<F>> pool() {
         return (Pool<GlyphRun<F>>)(Pool)POOL;
+    }
+
+    /**
+     * Shortcut to {@code <F>pool().obtain()}, optionally with call to enable {@link #checkpoints}.
+     */
+    public static <F extends Font<F>> GlyphRun<F> obtain(boolean withCheckpoints) {
+        final GlyphRun<F> run = GlyphRun.<F>pool().obtain();
+        if (withCheckpoints) {
+            run.setCheckpointsEnabled(true);
+        }
+        return run;
     }
 
     private static final int DEFAULT_SIZE = 32;
@@ -60,7 +74,8 @@ public final class GlyphRun<F extends Font<F>> implements Pool.Poolable {
     public final Array<Glyph> glyphs = new Array<>(true, DEFAULT_SIZE, Glyph.class);
     /** Where the glyph pen point is, relative to run origin, which is on the top-left-most point of the line.
      * Pen point is usually on the left bottom side of the glyph and typically lies on the baseline. */
-    public final FloatArray glyphX = new FloatArray(true, DEFAULT_SIZE), glyphY = new FloatArray(true, DEFAULT_SIZE);
+    public final FloatArray glyphX = new FloatArray(true, DEFAULT_SIZE);
+    public final FloatArray glyphY = new FloatArray(true, DEFAULT_SIZE);
 
     /** Range of the original text, which is drawn in this run. [start, end) */
     public int charactersStart, charactersEnd;
@@ -89,6 +104,12 @@ public final class GlyphRun<F extends Font<F>> implements Pool.Poolable {
      * @see GlyphRun#FLAG_ELLIPSIS */
     public byte characterFlags;
 
+    /** FOR USE BY GlyphLayout (and subclasses) ONLY!!!
+     * Stores length of {@link #characterPositions} (msb) packed with length of {@link #glyphs}.
+     * @see #setCheckpointsEnabled(boolean) to set the backing array of this field
+     * @see #createCheckpoint to populate */
+    public LongArray checkpoints = null;
+
     /**
      * @return width of the run, extended by draw bounds of last glyph, if those protrude {@link #width}
      */
@@ -115,6 +136,60 @@ public final class GlyphRun<F extends Font<F>> implements Pool.Poolable {
         glyphY.ensureCapacity(capacity);
     }
 
+    /** Controls whether or not {@link #checkpoints} can be used (is not null).
+     * @param enabled true = ensure that it is empty and not null, false = ensure that it is null */
+    public void setCheckpointsEnabled(boolean enabled) {
+        if (enabled) {
+            if (checkpoints == null) {
+                checkpoints = CHECKPOINTS_POOL.obtain();
+            } else {
+                checkpoints.clear();
+            }
+        } else {
+            if (checkpoints != null) {
+                CHECKPOINTS_POOL.free(checkpoints);
+                checkpoints = null;
+            }
+        }
+    }
+
+    /**
+     * Add [32 bit characterPositions.size | 32 bit glyphs.size] packed value to {@link #checkpoints} array.
+     * @throws NullPointerException when {@link #checkpoints} is null
+     */
+    public void createCheckpoint(int characterIndex, int glyphIndex) {
+        long value = ((long)characterIndex << 32) | (glyphIndex & 0xFFFF_FFFFL);
+        checkpoints.add(value);
+    }
+
+    public int getCheckpointIndexOfCharacter(int searchedCharacter) {
+        final int size = checkpoints.size;
+        if (size <= 0) {
+            return -1;
+        }
+
+        final long key = (long)searchedCharacter << 32;
+        final long[] items = checkpoints.items;
+
+        int index = Arrays.binarySearch(items, 0, size, key);
+        if (index < 0) {
+            index = -index - 1;
+        }
+
+        if (checkpointGetCharacter(items[index]) == searchedCharacter) {
+            return index;
+        }
+        return -1;
+    }
+
+    public static int checkpointGetCharacter(long checkpoint) {
+        return (int) (checkpoint >>> 32);
+    }
+
+    public static int checkpointGetGlyph(long checkpoint) {
+        return (int) (checkpoint & 0xFFFF_FFFFL);
+    }
+
     @Override
     public void reset() {
         line = 0;
@@ -126,5 +201,19 @@ public final class GlyphRun<F extends Font<F>> implements Pool.Poolable {
         glyphX.clear();
         glyphY.clear();
         characterPositions.clear();
+
+        setCheckpointsEnabled(false);
     }
+
+    private final Pool<LongArray> CHECKPOINTS_POOL = new Pool<LongArray>() {
+        @Override
+        protected LongArray newObject() {
+            return new LongArray(true, DEFAULT_SIZE);
+        }
+
+        @Override
+        protected void reset(LongArray object) {
+            object.clear();
+        }
+    };
 }

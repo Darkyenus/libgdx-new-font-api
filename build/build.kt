@@ -48,8 +48,9 @@ val experimentation by project(Archetypes.JavaProject) {
         compilerOptions[customFlags] += "-Xlint:unchecked"
     }
 
+    runOptions add { "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005" }
+
     extend (running) {
-        runOptions add { "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005" }
         unmanagedDependencies add { LocatedPath(path("libs/harfbuzz-natives.jar")) }
     }
 

@@ -14,7 +14,6 @@ import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeType;
 import com.badlogic.gdx.graphics.text.FontRenderCache;
-import com.badlogic.gdx.graphics.text.LayoutText;
 import com.badlogic.gdx.graphics.text.bitmap.BitmapFont;
 import com.badlogic.gdx.graphics.text.bitmap.BitmapFontSystem;
 import com.badlogic.gdx.graphics.text.bitmap.BitmapGlyphLayout;
@@ -236,9 +235,9 @@ public class HarfBuzzTest {
 
 
                 //sb.append("Hello world, WHY,\nVAVAW % Ø");
-                //sb.append(LOREM_IPSUM);
+                sb.append(LOREM_IPSUM);
                 //sb.append(HEBREW_WIKI);
-                sb.append(ENGLISH_WIKI);
+                //sb.append(ENGLISH_WIKI);
                 caretIndex = sb.length;
 
                 Gdx.input.setInputProcessor(new InputAdapter() {

@@ -73,7 +73,7 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
             //font.shape(shapeBuffer, NO_FEATURES);TODO
 
             // Create run
-            GlyphRun<HBFont> run = GlyphRun.<HBFont>pool().obtain();
+            GlyphRun<HBFont> run = GlyphRun.obtain(false);
             int shapedGlyphCount = shapeBuffer.getLength();
             run.ensureGlyphCapacity(shapedGlyphCount);
 
