@@ -136,7 +136,6 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
         final Array<Glyph> glyphs = run.glyphs;
         final FloatArray glyphX = run.glyphX;
-        final FloatArray glyphY = run.glyphY;
 
         BitmapFont.BitmapGlyph lastGlyph = findNextKerningGlyph(insertIndex, line, level, font);
 
@@ -194,14 +193,13 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                 }
             }
 
-            glyphs.add(glyph);
             if (lastGlyph != null) {
                 penX += font.getKerning(lastGlyph, glyph);
             }
+            glyphs.add(glyph);
             glyphX.add(penX);
+            // glyphY is filled in completeLine
             penX += glyph.xAdvance;
-            glyphY.add(-font.base);
-
             lastGlyph = glyph;
         }
 
@@ -340,7 +338,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             // We need to guarantee that space doesn't have a glyph, because of space collapsing when line-wrapping
             if (codepoint == COLLAPSIBLE_SPACE) {
                 penX += font.spaceXAdvance;
-                lastGlyph = null;// TODO(jp): this disables kerning pairs starting with space, is that a problem?
+                lastGlyph = null;
                 continue;
             }
 
@@ -410,11 +408,6 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         } else {
             addRunsFor_doAddGlyphsRtl(run, chars, runStart, runEnd, lastGlyph, characterPositions, font);
         }
-
-        // This layout does not do any special positioning on Y axis
-        run.glyphY.ensureCapacity(run.glyphX.size);
-        run.glyphY.size = run.glyphX.size;
-        Arrays.fill(run.glyphY.items, 0, run.glyphY.size, -font.base);
 
         // Complete
         startX += run.width;
@@ -516,7 +509,16 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         for (int i = runsStart; i < runsEnd; i++) {
             run = runs.items[i];
             assert run.line == line;
-            run.y = lineStartY - topToBaseline + run.font.base;
+
+            final float fontBase = run.font.base;
+            run.y = lineStartY - topToBaseline + fontBase;
+
+            // Fill the glyphY here
+            // (it is always one constant value, based on the font, and doing it earlier may lead to copying around
+            // extra values when wrapping)
+            final int glyphCount = run.glyphX.size;
+            Arrays.fill(run.glyphY.ensureCapacity(glyphCount), 0, glyphCount, -fontBase);
+            run.glyphY.size = glyphCount;
         }
 
         addLineHeight(finalLineHeight);
@@ -615,15 +617,23 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             newGlyphRun.charactersLevel = splitRun.charactersLevel;
             newGlyphRun.characterFlags = splitRun.characterFlags;// NOTE(jp): At the time of writing, this may copy only FLAG_GLYPH_RUN_KERN_TO_LAST_GLYPH
 
-            newGlyphRun.glyphs.addAll(splitRun.glyphs, runSplitGlyphIndex, splitRun.glyphs.size - runSplitGlyphIndex);
-            newGlyphRun.glyphX.addAll(splitRun.glyphX, runSplitGlyphIndex, splitRun.glyphX.size - runSplitGlyphIndex);
-            newGlyphRun.glyphY.addAll(splitRun.glyphY, runSplitGlyphIndex, splitRun.glyphY.size - runSplitGlyphIndex);
+            // optimized (0.1ms)
+            final int glyphCount = splitRun.glyphs.size - runSplitGlyphIndex;
+            System.arraycopy(splitRun.glyphs.items, runSplitGlyphIndex, newGlyphRun.glyphs.ensureCapacity(glyphCount), 0, glyphCount);
+            System.arraycopy(splitRun.glyphX.items, runSplitGlyphIndex, newGlyphRun.glyphX.ensureCapacity(glyphCount), 0, glyphCount);
+            // glyphY is not filled yet, it is filled in completeLine
+            newGlyphRun.glyphs.size = glyphCount;
+            newGlyphRun.glyphX.size = glyphCount;
 
-            assert splitRun.characterPositions.size - runSplitCharacterIndex == newGlyphRun.charactersEnd - newGlyphRun.charactersStart;
-            newGlyphRun.characterPositions.addAll(splitRun.characterPositions, runSplitCharacterIndex, splitRun.characterPositions.size - runSplitCharacterIndex);
+            final int characterCount = splitRun.characterPositions.size - runSplitCharacterIndex;
+            assert characterCount == newGlyphRun.charactersEnd - newGlyphRun.charactersStart;
+            System.arraycopy(splitRun.characterPositions.items, runSplitCharacterIndex, newGlyphRun.characterPositions.ensureCapacity(characterCount), 0, characterCount);
+            newGlyphRun.characterPositions.size = characterCount;
 
             newGlyphRun.setCheckpointsEnabled(true);
-            newGlyphRun.checkpoints.addAll(splitRun.checkpoints, runSplitCheckpointIndex, splitRun.checkpoints.size - runSplitCheckpointIndex);
+            final int checkpointCount = splitRun.checkpoints.size - runSplitCheckpointIndex;
+            System.arraycopy(splitRun.checkpoints.items, runSplitCheckpointIndex, newGlyphRun.checkpoints.ensureCapacity(checkpointCount), 0, checkpointCount);
+            newGlyphRun.checkpoints.size = checkpointCount;
 
             // Adjust new values (shift x coordinate)
             final float glyphZeroX = splitRun.glyphX.get(runSplitGlyphIndex);
@@ -643,7 +653,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             //splitRun.glyphs.removeRange(runSplitGlyphIndex, splitRun.glyphs.size);
             splitRun.glyphs.size = runSplitGlyphIndex;
             splitRun.glyphX.size = runSplitGlyphIndex;
-            splitRun.glyphY.size = runSplitGlyphIndex;
+            // glyphY is filled elsewhere
             splitRun.characterPositions.size = runSplitCharacterIndex;
             splitRun.checkpoints.size = runSplitCheckpointIndex;
 
