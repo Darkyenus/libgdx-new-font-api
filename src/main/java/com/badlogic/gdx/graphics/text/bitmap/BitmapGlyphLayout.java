@@ -10,6 +10,7 @@ import com.badlogic.gdx.utils.ObjectMap;
 
 import java.text.Bidi;
 import java.text.BreakIterator;
+import java.util.Arrays;
 import java.util.Locale;
 
 /**
@@ -95,6 +96,27 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         runs.add(run);
     }
 
+    private BitmapFont.BitmapGlyph findNextKerningGlyph(final int insertIndex, final int line, final byte level, final BitmapFont font) {
+        int previousRunIndex = insertIndex - 1;
+        while (previousRunIndex >= 0) {
+            GlyphRun<BitmapFont> previousRun = runs.items[previousRunIndex];
+            if (previousRun.line != line || previousRun.charactersLevel != level || previousRun.font != font
+                    || (previousRun.characterFlags & FLAG_GLYPH_RUN_KERN_TO_LAST_GLYPH) == 0) {
+                break;
+            }
+
+            // We should take kern glyph from this, run, but does it have it?
+            if (previousRun.glyphs.size > 0) {
+                return (BitmapFont.BitmapGlyph) previousRun.glyphs.items[previousRun.glyphs.size - 1];
+            }
+
+            // No, try the run before it
+            previousRunIndex--;
+        }
+
+        return null;
+    }
+
     private void addEllipsisRunFor(String chars, final byte level,
                            final BitmapFont font, final float color, final int line, int insertIndex) {
         final int length = chars.length();
@@ -116,26 +138,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         final FloatArray glyphX = run.glyphX;
         final FloatArray glyphY = run.glyphY;
 
-        BitmapFont.BitmapGlyph lastGlyph = null;
-        {
-            int previousRunIndex = insertIndex - 1;
-            while (previousRunIndex >= 0) {
-                GlyphRun<BitmapFont> previousRun = runs.items[insertIndex - 1];
-                if (previousRun.line != line || previousRun.charactersLevel != level || previousRun.font != font
-                        || (previousRun.characterFlags & FLAG_GLYPH_RUN_KERN_TO_LAST_GLYPH) == 0) {
-                    break;
-                }
-
-                // We should take kern glyph from this, run, but does it have it?
-                if (previousRun.glyphs.size > 0) {
-                    lastGlyph = (BitmapFont.BitmapGlyph) previousRun.glyphs.items[previousRun.glyphs.size - 1];
-                    break;
-                }
-
-                // No, try the run before it
-                previousRunIndex--;
-            }
-        }
+        BitmapFont.BitmapGlyph lastGlyph = findNextKerningGlyph(insertIndex, line, level, font);
 
         float penX = 0;
         for (int i = ltr ? 0 : length-1; ltr ? i < length : i >= 0; i += ltr ? 1 : -1) {
@@ -211,70 +214,30 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         runs.insert(insertIndex, run);
     }
 
-    /** @return number of added runs (must be >= 1) */
-    private int addRunsFor(final char[] chars, final int runStart, final int runEnd, final byte level,
-                           final BitmapFont font, final float color, final int line, int insertIndex) {
-        assert runStart < runEnd;
-        final boolean ltr = TextRun.isLevelLtr(level);
+    private void addRunsFor_doAddGlyphsLtr(final GlyphRun<BitmapFont> run, final char[] chars, final int runStart, final int runEnd,
+                                           BitmapFont.BitmapGlyph lastGlyph, final float[] characterPositions,
+                                           final BitmapFont font) {
+        // Preallocate max possible amount and do rest of the glyph value assignment on raw arrays
+        // This has surprisingly significant performance impact, as this loop is very tight.
+        final Glyph[] glyphs = run.glyphs.ensureCapacity(runEnd - runStart);
+        final float[] glyphX = run.glyphX.ensureCapacity(runEnd - runStart);
+        int glyphI = 0;
 
-        final GlyphRun<BitmapFont> run = GlyphRun.obtain(true);
-        run.ensureGlyphCapacity(runEnd - runStart);
-
-        final float[] characterPositions;
-
-        run.x = startX; // Y set later
-        run.line = line;
-        run.font = font;
-        run.color = color;
-        run.charactersLevel = level;
-        run.charactersStart = runStart;
-        run.charactersEnd = runEnd;
-        characterPositions = run.characterPositions.ensureCapacity(runEnd - runStart);
-        run.characterPositions.size = runEnd - runStart;
-
-        final Array<Glyph> glyphs = run.glyphs;
-        final FloatArray glyphX = run.glyphX;
-        final FloatArray glyphY = run.glyphY;
-
-        BitmapFont.BitmapGlyph lastGlyph = null;
-        {
-            int previousRunIndex = insertIndex - 1;
-            while (previousRunIndex >= 0) {
-                GlyphRun<BitmapFont> previousRun = runs.items[insertIndex - 1];
-                if (previousRun.line != line || previousRun.charactersLevel != level || previousRun.font != font
-                        || (previousRun.characterFlags & FLAG_GLYPH_RUN_KERN_TO_LAST_GLYPH) == 0) {
-                    break;
-                }
-
-                // We should take kern glyph from this, run, but does it have it?
-                if (previousRun.glyphs.size > 0) {
-                    lastGlyph = (BitmapFont.BitmapGlyph) previousRun.glyphs.items[previousRun.glyphs.size - 1];
-                    break;
-                }
-
-                // No, try the run before it
-                previousRunIndex--;
-            }
-        }
+        final long[] checkpoints = run.checkpoints.ensureCapacity(runEnd - runStart);
+        run.checkpoints.size = runEnd - runStart;
+        int checkpointI = 0;
 
         float penX = 0;
-        for (int i = ltr ? runStart : runEnd-1; ltr ? i < runEnd : i >= runStart; i += ltr ? 1 : -1) {
-            int checkpointPosition = i - runStart;
+        for (int i = runStart; i < runEnd; i++) {
             final int codepoint;
             {
                 final char c = chars[i];
                 if (Character.isSurrogate(c)) {
-                    if (ltr && Character.isHighSurrogate(c) && i + 1 < runEnd && Character.isLowSurrogate(chars[i+1])) {
+                    if (Character.isHighSurrogate(c) && i + 1 < runEnd && Character.isLowSurrogate(chars[i + 1])) {
                         // LTR: Valid surrogate pair
                         characterPositions[i - runStart] = penX;
                         i++;
                         characterPositions[i - runStart] = Float.NaN;
-                        codepoint = Character.toCodePoint(c, chars[i]);
-                    } else if (!ltr && Character.isLowSurrogate(c) && i - 1 >= runStart && Character.isHighSurrogate(chars[i-1])) {
-                        // RTL: Valid surrogate pair
-                        characterPositions[i - runStart] = Float.NaN;
-                        i--;
-                        characterPositions[checkpointPosition = i - runStart] = penX;
                         codepoint = Character.toCodePoint(c, chars[i]);
                     } else {
                         // Either unexpected low surrogate or incomplete high surrogate, so this is a broken character
@@ -286,7 +249,9 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                 }
             }
 
-            run.createCheckpoint(checkpointPosition, glyphs.size);
+            // Inlined run.createCheckpoint
+            final long checkpointValue = ((long) checkpointI << 32) | (glyphI & 0xFFFF_FFFFL);
+            checkpoints[checkpointI++] = checkpointValue;
 
             // We need to guarantee that space doesn't have a glyph, because of space collapsing when line-wrapping
             if (codepoint == COLLAPSIBLE_SPACE) {
@@ -316,23 +281,143 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                 }
             }
 
-            glyphs.add(glyph);
             if (lastGlyph != null) {
                 penX += font.getKerning(lastGlyph, glyph);
             }
-            glyphX.add(penX);
-            penX += glyph.xAdvance;
-            glyphY.add(-font.base);
 
+            glyphs[glyphI] = glyph;
+            glyphX[glyphI++] = penX;
+            penX += glyph.xAdvance;
             lastGlyph = glyph;
         }
 
-        startX += penX;
-
+        run.glyphs.size = glyphI;
+        run.glyphX.size = glyphI;
         run.width = penX;
         if (lastGlyph != null) {
             run.characterFlags |= FLAG_GLYPH_RUN_KERN_TO_LAST_GLYPH;
         }
+    }
+
+    private void addRunsFor_doAddGlyphsRtl(final GlyphRun<BitmapFont> run, final char[] chars, final int runStart, final int runEnd,
+                                           BitmapFont.BitmapGlyph lastGlyph, final float[] characterPositions,
+                                           final BitmapFont font) {
+        // See Ltr variant for more detailed comments
+        final Glyph[] glyphs = run.glyphs.ensureCapacity(runEnd - runStart);
+        final float[] glyphX = run.glyphX.ensureCapacity(runEnd - runStart);
+        int glyphI = 0;
+
+        final long[] checkpoints = run.checkpoints.ensureCapacity(runEnd - runStart);
+        run.checkpoints.size = runEnd - runStart;
+        int checkpointI = 0;
+
+        float penX = 0;
+        for (int i = runEnd - 1; i >= runStart; i--) {
+            final int codepoint;
+            {
+                final char c = chars[i];
+                if (Character.isSurrogate(c)) {
+                    if (Character.isLowSurrogate(c) && i - 1 >= runStart && Character.isHighSurrogate(chars[i - 1])) {
+                        // RTL: Valid surrogate pair
+                        characterPositions[i - runStart] = Float.NaN;
+                        i--;
+                        characterPositions[i - runStart] = penX;
+                        codepoint = Character.toCodePoint(c, chars[i]);
+                    } else {
+                        // Either unexpected low surrogate or incomplete high surrogate, so this is a broken character
+                        codepoint = '\uFFFD'; // https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+                    }
+                } else {
+                    codepoint = c;
+                    characterPositions[i - runStart] = penX;
+                }
+            }
+
+            // Slightly different from LTR variant because of different direction
+            final long checkpointValue = ((long) (i - runStart) << 32) | (glyphI & 0xFFFF_FFFFL);
+            checkpoints[checkpointI++] = checkpointValue;
+
+            // We need to guarantee that space doesn't have a glyph, because of space collapsing when line-wrapping
+            if (codepoint == COLLAPSIBLE_SPACE) {
+                penX += font.spaceXAdvance;
+                lastGlyph = null;// TODO(jp): this disables kerning pairs starting with space, is that a problem?
+                continue;
+            }
+
+            // Normal glyph handling
+            BitmapFont.BitmapGlyph glyph = font.getGlyph(codepoint);
+            if (glyph == null) {
+                byte handling = GlyphLayout.missingGlyphHandling(codepoint);
+                if (handling < 0) {
+                    glyph = font.getGlyph(Font.MISSING_GLYPH_ID);
+                    if (glyph == null) {
+                        // Missing glyph and no replacement, ignore it
+                        continue;
+                    }
+                } else if (handling == 0) {
+                    // Fully ignored
+                    continue;
+                } else {
+                    // Just advance and continue
+                    penX += font.spaceXAdvance * (handling / 8f);
+                    lastGlyph = null;
+                    continue;
+                }
+            }
+
+            if (lastGlyph != null) {
+                penX += font.getKerning(lastGlyph, glyph);
+            }
+
+            glyphs[glyphI] = glyph;
+            glyphX[glyphI++] = penX;
+            penX += glyph.xAdvance;
+            lastGlyph = glyph;
+        }
+
+        run.glyphs.size = glyphI;
+        run.glyphX.size = glyphI;
+        run.width = penX;
+        if (lastGlyph != null) {
+            run.characterFlags |= FLAG_GLYPH_RUN_KERN_TO_LAST_GLYPH;
+        }
+    }
+
+    /** @return number of added runs (must be >= 1) */
+    private int addRunsFor(final char[] chars, final int runStart, final int runEnd, final byte level,
+                           final BitmapFont font, final float color, final int line, int insertIndex) {
+        assert runStart < runEnd;
+        final boolean ltr = TextRun.isLevelLtr(level);
+
+        final GlyphRun<BitmapFont> run = GlyphRun.obtain(true);
+        run.ensureGlyphCapacity(runEnd - runStart);
+
+        run.x = startX; // Y set later
+        run.line = line;
+        run.font = font;
+        run.color = color;
+        run.charactersLevel = level;
+        run.charactersStart = runStart;
+        run.charactersEnd = runEnd;
+        final float[] characterPositions = run.characterPositions.ensureCapacity(runEnd - runStart);
+        run.characterPositions.size = runEnd - runStart;
+
+        BitmapFont.BitmapGlyph lastGlyph = findNextKerningGlyph(insertIndex, line, level, font);
+
+        // Attempt to optimize this method, as this method contains performance sensitive loop
+        if (ltr) {
+            addRunsFor_doAddGlyphsLtr(run, chars, runStart, runEnd, lastGlyph, characterPositions, font);
+        } else {
+            addRunsFor_doAddGlyphsRtl(run, chars, runStart, runEnd, lastGlyph, characterPositions, font);
+        }
+
+        // This layout does not do any special positioning on Y axis
+        run.glyphY.ensureCapacity(run.glyphX.size);
+        run.glyphY.size = run.glyphX.size;
+        Arrays.fill(run.glyphY.items, 0, run.glyphY.size, -font.base);
+
+        // Complete
+        startX += run.width;
         runs.insert(insertIndex, run);
         return 1;
     }
