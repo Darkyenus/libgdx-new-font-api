@@ -320,19 +320,23 @@ public class HarfBuzzTest {
 
                 final float targetWidth = 300f;
                 layout.clear();
-                final long layoutStart = System.nanoTime();
-                for (int i = 0; i < 100; i++) {
-                    layout.layoutText(text, targetWidth, /*300f*/0f, align, "...");
-                }
-                final double duration = (System.nanoTime() - layoutStart) / 100_000_000.0;
+
                 if (Gdx.input.isKeyPressed(Input.Keys.F1)) {
+                    final int benchmarkLoopCount = 1000;
+                    final long layoutStart = System.nanoTime();
+                    for (int i = 0; i < benchmarkLoopCount; i++) {
+                        layout.layoutText(text, targetWidth,0f, align, "...");
+                    }
+                    final double duration = (System.nanoTime() - layoutStart) / (1_000_000.0 * benchmarkLoopCount);
 
                     final long legacyLayoutStart = System.nanoTime();
-                    for (int i = 0; i < 100; i++) {
+                    for (int i = 0; i < benchmarkLoopCount; i++) {
                         legacyGlyphLayout.setText(legacyBitmapFont, sb, Color.BLACK, targetWidth, align, true);
                     }
-                    final double legacyLayoutDuration = (System.nanoTime() - legacyLayoutStart) / 100_000_000.0;
+                    final double legacyLayoutDuration = (System.nanoTime() - legacyLayoutStart) / (1_000_000.0 * benchmarkLoopCount);
                     System.out.printf("%.3f ms (legacy: %.3f ms)\n", duration, legacyLayoutDuration);
+                } else {
+                    layout.layoutText(text, targetWidth, /*300f*/0f, align, "...");
                 }
 
                 final float textX = Gdx.graphics.getWidth()/2f - layout.getAlignWidth()/2f;
