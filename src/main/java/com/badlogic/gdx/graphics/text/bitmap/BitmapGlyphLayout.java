@@ -19,6 +19,15 @@ import java.util.Locale;
 public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
     private static final byte FLAG_GLYPH_RUN_KERN_TO_LAST_GLYPH = (byte) (1 << 7);
+    private static final byte FLAG_GLYPH_RUN_HAS_COLLAPSED_SPACES = (byte) (1 << 6);
+
+    /** When line that needs to be wrapped ends with this character (normal space),
+     * arbitrary amount of these characters that overflow will be "collapsed", i.e. all positioned at the same
+     * rightmost available position on the line.
+     * It is expected that the character is not visible, so this does not look strange.
+     * There is a "special case": when the collapsed characters end with a newline, the newline is still considered
+     * a part of the original wrapped line with collapsed characters, not as a solo newline on a line.
+     * This is what regular text editors do (at least on Mac), even when invisible characters (such as space) are shown. */
     private static final char COLLAPSIBLE_SPACE = ' ';
 
     /** Borrowed by BitmapGlyphLayout instances when they are doing glyph layout, to store all fonts in the layout. */
@@ -165,13 +174,6 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
             run.createCheckpoint(checkpointPosition, glyphs.size);
 
-            // We need to guarantee that space doesn't have a glyph, because of space collapsing when line-wrapping
-            if (codepoint == COLLAPSIBLE_SPACE) {
-                penX += font.spaceXAdvance;
-                lastGlyph = null;// TODO(jp): this disables kerning pairs starting with space, is that a problem?
-                continue;
-            }
-
             // Normal glyph handling
             BitmapFont.BitmapGlyph glyph = font.getGlyph(codepoint);
             if (glyph == null) {
@@ -251,13 +253,6 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             final long checkpointValue = ((long) checkpointI << 32) | (glyphI & 0xFFFF_FFFFL);
             checkpoints[checkpointI++] = checkpointValue;
 
-            // We need to guarantee that space doesn't have a glyph, because of space collapsing when line-wrapping
-            if (codepoint == COLLAPSIBLE_SPACE) {
-                penX += font.spaceXAdvance;
-                lastGlyph = null;// TODO(jp): this disables kerning pairs starting with space, is that a problem?
-                continue;
-            }
-
             // Normal glyph handling
             BitmapFont.BitmapGlyph glyph = font.getGlyph(codepoint);
             if (glyph == null) {
@@ -334,13 +329,6 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             // Slightly different from LTR variant because of different direction
             final long checkpointValue = ((long) (i - runStart) << 32) | (glyphI & 0xFFFF_FFFFL);
             checkpoints[checkpointI++] = checkpointValue;
-
-            // We need to guarantee that space doesn't have a glyph, because of space collapsing when line-wrapping
-            if (codepoint == COLLAPSIBLE_SPACE) {
-                penX += font.spaceXAdvance;
-                lastGlyph = null;
-                continue;
-            }
 
             // Normal glyph handling
             BitmapFont.BitmapGlyph glyph = font.getGlyph(codepoint);
@@ -649,7 +637,8 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
             // Trim the split values from the original run
             splitRun.charactersEnd = splitIndex;
-            // NOTE(jp): removeRange does not clear removed items to null, so doing just length manipulation is faster
+            // NOTE(jp): removeRange does not clear removed items to null, so doing just length manipulation
+            // has the same effect and is faster
             //splitRun.glyphs.removeRange(runSplitGlyphIndex, splitRun.glyphs.size);
             splitRun.glyphs.size = runSplitGlyphIndex;
             splitRun.glyphX.size = runSplitGlyphIndex;
@@ -680,7 +669,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             insertIndex += addRunsFor(chars, splitRun.charactersStart, splitIndex, splitRun.charactersLevel,
                     splitRun.font, splitRun.color, splitRun.line, insertIndex);
 
-            startX = 0f;// Not really needed, but cleaner
+            startX = 0f;// Not really needed as it is reordered later, but cleaner
             addRunsFor(chars, splitIndex, splitRun.charactersEnd, splitRun.charactersLevel,
                     splitRun.font, splitRun.color, splitRun.line + 1, // To prevent kerning with previous run
                     insertIndex);
@@ -772,7 +761,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
             final int flags = textRun.flags;
             final boolean lastTextRun = (flags & TextRun.FLAG_LAST_RUN) != 0;
-            final boolean linebreak = (flags & TextRun.FLAG_LINE_BREAK) != 0;
+            boolean linebreak = (flags & TextRun.FLAG_LINE_BREAK) != 0;
 
             // Add the run(s)
             if (linebreak) {
@@ -784,6 +773,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             }
 
             // Wrapping
+            wrapping:
             while (startX >= availableWidth) {
                 assert lineLaidRuns < runs.size;
 
@@ -828,37 +818,104 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
                 // Find where actual split happens and split it there
                 final int splitRunIndex = runIndexWithCharIndex(lineLaidRuns, realWrapIndex);
-                final int firstRunOnWrappedLineIndex = splitRunForWrap(chars, splitRunIndex, realWrapIndex);
+                int firstRunOnWrappedLineIndex = splitRunForWrap(chars, splitRunIndex, realWrapIndex);
 
-                // Truncate everything between wrapIndex and firstRunOnWrappedLineIndex run
-                int truncateRunIndex = runIndexWithCharIndex(lineLaidRuns, wrapIndex);
-                if (truncateRunIndex < firstRunOnWrappedLineIndex) {
+                final boolean wrappedBecauseOfCollapsedText = firstRunOnWrappedLineIndex == runs.size;
+                // When collapsed spaces end with a newline, it won't be moved to a next line,
+                // as a normal letter would do, but it will stay on this line. (This applies only to the first newline.)
+                // (This is what happens when editing text on Mac and presumably on other OSes too)
+
+                // wrappedBecauseOfCollapsedText is true when the currently laid text ends with collapsible space,
+                // which makes it go over the width, but can be collapsed so it doesn't. Now three things can happen:
+                // 1. Normal text run goes after this, in which case it should start on a new line
+                //      -> We defer the collapsing and wrapping logic to the next iteration and bail
+                // 2. Newline goes after this - this newline should still be part of this line
+                //      -> Same as case 1, but the collapsing logic has a special case for this
+                // 3. This is the last line
+                //      -> We have to do the wrapping now, because there is no other iteration to defer it to,
+                //         but we won't increment the line variable, because the cursor should stay on this collapsed line
+
+                if (wrappedBecauseOfCollapsedText) {
+                    if (!lastTextRun) {
+                        break wrapping;
+                    }
+                } else {
+                    final GlyphRun<BitmapFont> linebreakRun = runs.items[firstRunOnWrappedLineIndex];
+                    if ((linebreakRun.characterFlags & GlyphRun.FLAG_LINEBREAK) != 0) {
+                        // This is the special case mentioned in situation 2,
+                        // we leave the newline together with the collapsed chars
+
+                        // This special case is really only expected to happen after linebreak has been just added.
+                        assert firstRunOnWrappedLineIndex + 1 == runs.size;
+                        assert linebreak;
+
+                        firstRunOnWrappedLineIndex++;
+                        //realWrapIndex = linebreakRun.charactersEnd;
+                        // (above line commented out because realWrapIndex is no longer used after this,
+                        // but technically that is what happens)
+                    }
+                }
+
+                // Collapse everything between wrapIndex and firstRunOnWrappedLineIndex run
+                int collapseRunIndex = runIndexWithCharIndex(lineLaidRuns, wrapIndex);
+                if (collapseRunIndex < firstRunOnWrappedLineIndex) {
                     // There is something to truncate
-                    GlyphRun<BitmapFont> truncateRun = runs.items[truncateRunIndex];
-                    int truncateFromIndex = wrapIndex - truncateRun.charactersStart;
-                    assert (truncateRun.characterFlags & (GlyphRun.FLAG_LINEBREAK | GlyphRun.FLAG_TAB)) == 0;
-                    float truncateToPos = truncateRun.characterPositions.items[wrapIndex - truncateRun.charactersStart];
+                    GlyphRun<BitmapFont> collapseRun = runs.items[collapseRunIndex];
+                    int collapseFromIndex = wrapIndex - collapseRun.charactersStart;
+                    assert (collapseRun.characterFlags & GlyphRun.FLAG_TAB) == 0;
+                    assert (collapseRun.characterFlags & GlyphRun.FLAG_LINEBREAK) == 0 || collapseRunIndex + 1 == firstRunOnWrappedLineIndex;
+
+                    float collapseToPos;
+                    {// Ensure that we don't overflow the available width
+                        final int collapseToCharacterIndex = wrapIndex - collapseRun.charactersStart + 1;
+                        if (collapseToCharacterIndex >= collapseRun.characterPositions.size) {
+                            collapseToPos = collapseRun.width;
+                        } else {
+                            collapseToPos = collapseRun.characterPositions.items[collapseToCharacterIndex];
+                        }
+
+                        final float maxCollapseToPos = availableWidth - collapseRun.x;
+                        if (maxCollapseToPos < collapseToPos) {
+                            collapseToPos = maxCollapseToPos;
+                        }
+                    }
 
                     while (true) {
-                        // Set positions
-                        for (int i = truncateFromIndex; i < truncateRun.characterPositions.size; i++) {
-                            truncateRun.characterPositions.items[i] = truncateToPos;
+                        // Set positions of glyphs (space glyphs, presumably, from back to front)
+                        for (int i = collapseRun.glyphs.size-1; i > 0; i--) {
+                            final float glyphXAdvance = ((BitmapFont.BitmapGlyph) collapseRun.glyphs.items[i]).xAdvance;
+                            final float originalX = collapseRun.glyphX.items[i];
+                            if (originalX + glyphXAdvance <= collapseToPos) {
+                                // Glyphs that were not collapsed start here
+                                break;
+                            }
+                            // This glyph should be moved so that it does not extend the size of the layout
+                            collapseRun.glyphX.items[i] = collapseToPos - glyphXAdvance;
                         }
+
+                        // Set positions of characters
+                        for (int i = collapseFromIndex; i < collapseRun.characterPositions.size; i++) {
+                            collapseRun.characterPositions.items[i] = collapseToPos;
+                        }
+
                         // Trim width
-                        truncateRun.width = truncateToPos;
+                        collapseRun.width = collapseToPos;
+
+                        // Set flag indicating that this has collapsed spaces
+                        collapseRun.characterFlags |= FLAG_GLYPH_RUN_HAS_COLLAPSED_SPACES;
 
                         // Advance to next run for truncation
-                        if (++truncateRunIndex >= firstRunOnWrappedLineIndex) {
+                        if (++collapseRunIndex >= firstRunOnWrappedLineIndex) {
                             break;
                         }
 
-                        final GlyphRun<BitmapFont> newTruncateRun = runs.items[truncateRunIndex];
-                        newTruncateRun.x = truncateRun.x + truncateRun.width;
+                        final GlyphRun<BitmapFont> newCollapseRun = runs.items[collapseRunIndex];
+                        newCollapseRun.x = collapseRun.x + collapseRun.width;
                         // This new run should not have any glyphs
-                        assert newTruncateRun.glyphs.size == 0;
-                        truncateRun = newTruncateRun;
-                        truncateFromIndex = 0;
-                        truncateToPos = 0f;
+                        assert newCollapseRun.glyphs.size == 0;
+                        collapseRun = newCollapseRun;
+                        collapseFromIndex = 0;
+                        collapseToPos = 0f;
                     }
                 }
 
@@ -883,23 +940,27 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
                 }
 
                 // Line wrapping is done. Since this is a while-loop, it may run multiple times, because the wrapped
-                // runs may still be too long to fit. This is sadly O(n^2), but will be pretty hard to optimize.
-                // If this turns out to be a problem, reducing the length of text in runs should help, either by changing
-                // styling or by introducing explicit line breaks.
+                // runs may still be too long to fit. This can degrade to "slow" O(n^2) when the font/text is extremely
+                // ligature heavy, see splitRunForWrap. Though this shouldn't happen often.
+                // (as of writing this, it should never happen, as BitmapFont does not generate any ligatures,
+                // but maybe in the future)
             }
 
             if (lastTextRun || linebreak) {
-                completeLine(text, lineLaidRuns, runs.size, textRun.font);
-                lineLaidRuns = runs.size;
+                // Line probably has to be completed, unless it has been completed before by wrapping algo
+
+                if (lineLaidRuns < runs.size) {
+                    completeLine(text, lineLaidRuns, runs.size, textRun.font);
+                    lineLaidRuns = runs.size;
+                    line++;
+                }
 
                 // Check vertical limits
-                if (line > 0 && getHeight() > availableHeight) {
+                if (line >= 2 && getHeight() > availableHeight) {
                     // This line is too high, it will be discarded
                     clampLines = true;
                     break;
                 }
-
-                line++;
 
                 if (line >= maxLines) {
                     // Following lines will be clamped, are there any?

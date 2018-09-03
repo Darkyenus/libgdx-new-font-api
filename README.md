@@ -89,7 +89,7 @@ and ellipsis truncation.
 	- Simple, Java only backend for static `.fnt` files
 	- Assumes that each codepoint corresponds to exactly one glyph, which is not true for all unicode characters,
 	but `.fnt` files don't support anything more complex. Therefore it supports Hebrew (simple RTL),
-	but not Arabic (RTL, complex glyph variants).
+	but not Arabic (RTL + complex glyph variants).
 	- Since it is Java only, it works on all backends, including GWT. Note that GWT does not support `java.text.Bidi`,
 	so the support for bidirectional text will be, most likely, missing, and only single-direction text (with user-defined direction) will be possible.
 - **HarfBuzz**
@@ -119,7 +119,6 @@ and ellipsis truncation.
 
 ### ToDo
 - BitmapFontSystem
-	- Optimize for heavily wrapped text
 	- Fallback fonts
 - Text editing introspection
 	- "how should I render selection?"

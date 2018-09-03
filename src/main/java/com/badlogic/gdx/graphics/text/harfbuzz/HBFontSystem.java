@@ -1,6 +1,7 @@
 package com.badlogic.gdx.graphics.text.harfbuzz;
 
 import com.badlogic.gdx.files.FileHandle;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeType;
 import com.badlogic.gdx.graphics.text.FontSystem;
 
 /**
@@ -9,6 +10,12 @@ import com.badlogic.gdx.graphics.text.FontSystem;
  * Create only one instance per application!
  */
 public class HBFontSystem implements FontSystem<HBGlyphLayout> {
+
+    private final FreeType.Library freeTypeLibrary;
+
+    public HBFontSystem() {
+        this.freeTypeLibrary = FreeType.initFreeType();
+    }
 
     /**
      * Create incrementally built font of given dimensions.
