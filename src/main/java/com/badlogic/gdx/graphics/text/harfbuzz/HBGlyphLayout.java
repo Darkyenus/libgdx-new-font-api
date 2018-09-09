@@ -610,120 +610,7 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
 
         // All relevant text runs were added, ensure that we fit with number of lines/height
         if (clampLines) {
-            final FloatArray lineHeights = this.lineHeights;
-
-            // Discard any line information about the last line or any following lines
-            if (getHeight() > availableHeight) {
-                // Convert to max lines problem
-                // Remove lines that overflow
-                while (lineHeights.size > 0 && lineHeights.items[lineHeights.size-1] > availableHeight) {
-                    lineHeights.size--;
-                }
-                // Now we know how many lines we can fit
-                maxLines = lineHeights.size;
-                // Discard lineHeight of the last (valid) line, because we will recompute it later
-                lineHeights.size--;
-            } else {
-                // Drop extra line heights
-                assert lineHeights.size >= maxLines - 1;
-                lineHeights.size = maxLines - 1;
-            }
-            line = maxLines - 1;
-
-            // Drop extra runs, if any
-            for (int i = runs.size-1; i >= 0; i--) {
-                GlyphRun<HBFont> run = runs.items[i];
-
-                if (run.line >= maxLines) {
-                    runs.items[i] = null;
-                    runs.size = i;
-                    GlyphRun.<HBFont>pool().free(run);
-                } else {
-                    if (run.line == maxLines - 1 && (run.characterFlags & GlyphRun.FLAG_LINEBREAK) != 0) {
-                        // This run is on a valid line, but it is a linebreak, so it has to go as well
-                        runs.items[i] = null;
-                        runs.size = i;
-                        GlyphRun.<HBFont>pool().free(run);
-                    }
-                    break;
-                }
-            }
-
-            // Update lineLaidRuns to a valid value, as it may be wrong and point to a different line
-            lineLaidRuns = runs.size;
-            while (lineLaidRuns > 0 && runs.items[lineLaidRuns - 1].line == line) {
-                lineLaidRuns--;
-            }
-
-            // Generate ellipsis and trim the last line to fit it
-            int ellipsisStart = runs.size;
-
-            // Reset startX, it may be in inconsistent state
-            if (ellipsisStart <= lineLaidRuns) {
-                startX = 0f;
-            } else {
-                final GlyphRun<HBFont> lastRun = runs.items[ellipsisStart - 1];
-                startX = lastRun.x + lastRun.width;
-            }
-
-            // Add the ellipsis run (no ellipsis = 0-width ellipsis with no runs)
-            final float ellipsisWidth;
-            if (ellipsis != null && !ellipsis.isEmpty()) {
-                final float startXBeforeEllipsis = startX;
-                // TODO(jp): Not implemented!
-                /*addEllipsisRunFor(ellipsis, (byte) (text.isLeftToRight() ? 0 : 1),
-                        text.getInitialFont(), text.getInitialColor(), line, ellipsisStart);*/
-                ellipsisWidth = startX - startXBeforeEllipsis;
-            } else {
-                ellipsisWidth = 0f;
-            }
-
-            // Trim previous runs, so that ellipsis fits on the line width-wise
-            /* // TODO(jp): Implement!
-            if (startX > availableWidth) {
-                // We need to trim
-                int trimmedIndex = ellipsisStart - 1;
-                GlyphRun<HBFont> trimmedRun;
-                while (trimmedIndex >= 0 && (trimmedRun = runs.items[trimmedIndex]).line == line) {
-                    if (trimmedRun.x + ellipsisWidth >= availableWidth) {
-                        // Even with this removed, ellipsis won't fit, so remove it
-                        startX = trimmedRun.x;
-                        GlyphRun.<HBFont>pool().free(trimmedRun);
-                        runs.removeIndex(trimmedIndex);
-                        ellipsisStart--;
-                        trimmedIndex--;
-                        continue;
-                    } else if (trimmedRun.x + trimmedRun.width + ellipsisWidth <= availableWidth) {
-                        // This somehow fits, don't do anything
-                        break;
-                    }
-                    // This run does not need to be removed, but we need to trim it
-                    startX = trimmedRun.x;
-                    final boolean trimmedRunLtr = trimmedRun.isLtr();
-                    int charactersEnd = charEndIndexForTargetRunWidth(trimmedRun, availableWidth - ellipsisWidth - trimmedRun.x);
-                    runs.removeIndex(trimmedIndex);
-                    ellipsisStart--;
-                    if (trimmedRunLtr ? charactersEnd <= trimmedRun.charactersStart : charactersEnd > trimmedRun.charactersEnd) {
-                        // Run has to be removed completely anyway
-                        break;
-                    } else {
-                        // Run can be re-added, with less characters
-                        ellipsisStart += addRunsFor(chars, trimmedRun.charactersStart, charactersEnd, trimmedRun.charactersLevel,
-                                trimmedRun.font, trimmedRun.color, trimmedRun.line, trimmedIndex);
-                    }
-                    GlyphRun.<HBFont>pool().free(trimmedRun);
-                }
-
-                // Reposition ellipsis according to current startX
-                for (int i = ellipsisStart; i < runs.size; i++) {
-                    GlyphRun<HBFont> ellipsisRun = runs.items[i];
-                    ellipsisRun.x = startX;
-                    startX += ellipsisRun.width;
-                }
-            }*/
-
-            // Re-complete the line
-            completeLine(text, lineLaidRuns, runs.size, text.getInitialFont());
+            clampExtraLines(text, availableWidth, availableHeight, maxLines, ellipsis);
         }
 
         final Array<HBFont> fonts = usedFonts;
@@ -731,6 +618,128 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
             font.prepareGlyphs();
         }
         fonts.clear();
+    }
+
+    private void clampExtraLines(final LayoutText<HBFont> text, final float availableWidth, final float availableHeight,
+                                 int maxLines, final String ellipsis) {
+        final Array<GlyphRun<HBFont>> runs = this.runs;
+        final FloatArray lineHeights = this.lineHeights;
+
+        // Discard any line information about the last line or any following lines
+        if (getHeight() > availableHeight) {
+            // Convert to max lines problem
+            // Remove lines that overflow
+            while (lineHeights.size > 0 && lineHeights.items[lineHeights.size - 1] > availableHeight) {
+                lineHeights.size--;
+            }
+            // Now we know how many lines we can fit
+            maxLines = lineHeights.size;
+            // Discard lineHeight of the last (valid) line, because we will recompute it later
+            lineHeights.size--;
+        } else {
+            // Drop extra line heights
+            assert lineHeights.size >= maxLines - 1;
+            lineHeights.size = maxLines - 1;
+        }
+        final int lastAllowedLine = maxLines - 1;
+
+        // Drop extra runs, if any
+        for (int i = runs.size - 1; i >= 0; i--) {
+            GlyphRun<HBFont> run = runs.items[i];
+
+            if (run.line >= maxLines) {
+                runs.items[i] = null;
+                runs.size = i;
+                GlyphRun.<HBFont>pool().free(run);
+            } else {
+                if (run.line == maxLines - 1 && (run.characterFlags & GlyphRun.FLAG_LINEBREAK) != 0) {
+                    // This run is on a valid line, but it is a linebreak, so it has to go as well
+                    runs.items[i] = null;
+                    runs.size = i;
+                    GlyphRun.<HBFont>pool().free(run);
+                }
+                break;
+            }
+        }
+
+        // Update lineLaidRuns to a valid value, as it may be wrong and point to a different line
+        int lineLaidRuns = runs.size;
+        while (lineLaidRuns > 0 && runs.items[lineLaidRuns - 1].line == lastAllowedLine) {
+            lineLaidRuns--;
+        }
+
+        // Generate ellipsis and trim the last line to fit it
+        int ellipsisStart = runs.size;
+
+        // Reset startX, it may be in inconsistent state
+        if (ellipsisStart <= lineLaidRuns) {
+            startX = 0f;
+        } else {
+            final GlyphRun<HBFont> lastRun = runs.items[ellipsisStart - 1];
+            startX = lastRun.x + lastRun.width;
+        }
+
+        // Add the ellipsis run (no ellipsis = 0-width ellipsis with no runs)
+        final float ellipsisWidth;
+        if (ellipsis != null && !ellipsis.isEmpty()) {
+            final float startXBeforeEllipsis = startX;
+            // TODO(jp): Implement
+            /*addEllipsisRunFor(ellipsis, (byte) (text.isLeftToRight() ? 0 : 1),
+                    text.getInitialFont(), text.getInitialColor(), lastAllowedLine, ellipsisStart);*/
+            ellipsisWidth = startX - startXBeforeEllipsis;
+        } else {
+            ellipsisWidth = 0f;
+        }
+
+        // Trim previous runs, so that ellipsis fits on the line width-wise
+        if (startX > availableWidth) {
+            final char[] chars = text.text();
+
+            // We need to trim
+            int trimmedIndex = ellipsisStart - 1;
+            GlyphRun<HBFont> trimmedRun;
+            while (trimmedIndex >= 0 && (trimmedRun = runs.items[trimmedIndex]).line == lastAllowedLine) {
+                if (trimmedRun.x + ellipsisWidth >= availableWidth) {
+                    // Even with this removed, ellipsis won't fit, so remove it
+                    startX = trimmedRun.x;
+                    GlyphRun.<HBFont>pool().free(trimmedRun);
+                    runs.removeIndex(trimmedIndex);
+                    ellipsisStart--;
+                    trimmedIndex--;
+                    continue;
+                } else if (trimmedRun.x + trimmedRun.width + ellipsisWidth <= availableWidth) {
+                    // This somehow fits, don't do anything
+                    break;
+                }
+                // This run does not need to be removed, but we need to trim it
+                startX = trimmedRun.x;
+                /* TODO Implement
+                final boolean trimmedRunLtr = trimmedRun.isLtr();
+                int charactersEnd = charEndIndexForTargetRunWidth(trimmedRun, availableWidth - ellipsisWidth - trimmedRun.x);
+                runs.removeIndex(trimmedIndex);
+                ellipsisStart--;
+                if (trimmedRunLtr ? charactersEnd <= trimmedRun.charactersStart : charactersEnd > trimmedRun.charactersEnd) {
+                    // Run has to be removed completely anyway
+                    break;
+                } else {
+                    // Run can be re-added, with less characters
+                    ellipsisStart += addRunsFor(chars, trimmedRun.charactersStart, charactersEnd, trimmedRun.charactersLevel,
+                            trimmedRun.font, trimmedRun.color, trimmedRun.line, trimmedIndex);
+                }
+                */
+                GlyphRun.<HBFont>pool().free(trimmedRun);
+            }
+
+            // Reposition ellipsis according to current startX
+            for (int i = ellipsisStart; i < runs.size; i++) {
+                GlyphRun<HBFont> ellipsisRun = runs.items[i];
+                ellipsisRun.x = startX;
+                startX += ellipsisRun.width;
+            }
+        }
+
+        // Re-complete the line
+        completeLine(text, lineLaidRuns, runs.size, text.getInitialFont());
     }
 
 }

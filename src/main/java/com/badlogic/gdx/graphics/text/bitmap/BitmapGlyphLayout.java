@@ -213,10 +213,9 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         runs.insert(insertIndex, run);
     }
 
-    // TODO(jp): Join LTR and RTL to one method and measure perf. impact
-    private void addRunsFor_doAddGlyphsLtr(final GlyphRun<BitmapFont> run, final char[] chars, final int runStart, final int runEnd,
+    private void addRunsFor_doAddGlyphs(final GlyphRun<BitmapFont> run, final char[] chars, final int runStart, final int runEnd,
                                            BitmapFont.BitmapGlyph lastGlyph, final float[] characterPositions,
-                                           final BitmapFont font) {
+                                           final BitmapFont font, final boolean ltr) {
         // Preallocate max possible amount and do rest of the glyph value assignment on raw arrays
         // This has surprisingly significant performance impact, as this loop is very tight.
         final Glyph[] glyphs = run.glyphs.ensureCapacity(runEnd - runStart);
@@ -228,20 +227,35 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         int checkpointI = 0;
 
         float penX = 0;
-        for (int i = runStart; i < runEnd; i++) {
+        // It would be tempting to create separate LTR/RTL variants of this method,
+        // but the performance is not improved and the code is less readable.
+        for (int i = ltr ? runStart : runEnd - 1, inc = ltr ? 1 : -1; i < runEnd && i >= runStart; i += inc) {
             final int codepoint;
             {
                 final char c = chars[i];
                 if (Character.isSurrogate(c)) {
-                    if (Character.isHighSurrogate(c) && i + 1 < runEnd && Character.isLowSurrogate(chars[i + 1])) {
-                        // LTR: Valid surrogate pair
-                        characterPositions[i - runStart] = penX;
-                        i++;
-                        characterPositions[i - runStart] = Float.NaN;
-                        codepoint = Character.toCodePoint(c, chars[i]);
+                    if (ltr) {
+                        if (Character.isHighSurrogate(c) && i + 1 < runEnd && Character.isLowSurrogate(chars[i + 1])) {
+                            // LTR: Valid surrogate pair
+                            characterPositions[i - runStart] = penX;
+                            i++;
+                            characterPositions[i - runStart] = Float.NaN;
+                            codepoint = Character.toCodePoint(c, chars[i]);
+                        } else {
+                            // Either unexpected low surrogate or incomplete high surrogate, so this is a broken character
+                            codepoint = '\uFFFD'; // https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+                        }
                     } else {
-                        // Either unexpected low surrogate or incomplete high surrogate, so this is a broken character
-                        codepoint = '\uFFFD'; // https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+                        if (Character.isLowSurrogate(c) && i - 1 >= runStart && Character.isHighSurrogate(chars[i - 1])) {
+                            // RTL: Valid surrogate pair
+                            characterPositions[i - runStart] = Float.NaN;
+                            i--;
+                            characterPositions[i - runStart] = penX;
+                            codepoint = Character.toCodePoint(c, chars[i]);
+                        } else {
+                            // Either unexpected low surrogate or incomplete high surrogate, so this is a broken character
+                            codepoint = '\uFFFD'; // https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+                        }
                     }
                 } else {
                     codepoint = c;
@@ -250,84 +264,14 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             }
 
             // Inlined run.createCheckpoint
-            final long checkpointValue = ((long) checkpointI << 32) | (glyphI & 0xFFFF_FFFFL);
-            checkpoints[checkpointI++] = checkpointValue;
-
-            // Normal glyph handling
-            BitmapFont.BitmapGlyph glyph = font.getGlyph(codepoint);
-            if (glyph == null) {
-                byte handling = GlyphLayout.missingGlyphHandling(codepoint);
-                if (handling < 0) {
-                    glyph = font.getGlyph(Font.MISSING_GLYPH_ID);
-                    if (glyph == null) {
-                        // Missing glyph and no replacement, ignore it
-                        continue;
-                    }
-                } else if (handling == 0) {
-                    // Fully ignored
-                    continue;
-                } else {
-                    // Just advance and continue
-                    penX += font.spaceXAdvance * (handling / 8f);
-                    lastGlyph = null;
-                    continue;
-                }
+            final long checkpointValue;
+            if (ltr) {
+                checkpointValue = ((long) checkpointI << 32) | (glyphI & 0xFFFF_FFFFL);
+            } else {
+                // Slightly different from LTR variant because of different direction
+                // TODO(jp): But is it?
+                checkpointValue = ((long) (i - runStart) << 32) | (glyphI & 0xFFFF_FFFFL);
             }
-
-            if (lastGlyph != null) {
-                penX += font.getKerning(lastGlyph, glyph);
-            }
-
-            glyphs[glyphI] = glyph;
-            glyphX[glyphI++] = penX;
-            penX += glyph.xAdvance;
-            lastGlyph = glyph;
-        }
-
-        run.glyphs.size = glyphI;
-        run.glyphX.size = glyphI;
-        run.width = penX;
-        if (lastGlyph != null) {
-            run.characterFlags |= FLAG_GLYPH_RUN_KERN_TO_LAST_GLYPH;
-        }
-    }
-
-    private void addRunsFor_doAddGlyphsRtl(final GlyphRun<BitmapFont> run, final char[] chars, final int runStart, final int runEnd,
-                                           BitmapFont.BitmapGlyph lastGlyph, final float[] characterPositions,
-                                           final BitmapFont font) {
-        // See Ltr variant for more detailed comments
-        final Glyph[] glyphs = run.glyphs.ensureCapacity(runEnd - runStart);
-        final float[] glyphX = run.glyphX.ensureCapacity(runEnd - runStart);
-        int glyphI = 0;
-
-        final long[] checkpoints = run.checkpoints.ensureCapacity(runEnd - runStart);
-        run.checkpoints.size = runEnd - runStart;
-        int checkpointI = 0;
-
-        float penX = 0;
-        for (int i = runEnd - 1; i >= runStart; i--) {
-            final int codepoint;
-            {
-                final char c = chars[i];
-                if (Character.isSurrogate(c)) {
-                    if (Character.isLowSurrogate(c) && i - 1 >= runStart && Character.isHighSurrogate(chars[i - 1])) {
-                        // RTL: Valid surrogate pair
-                        characterPositions[i - runStart] = Float.NaN;
-                        i--;
-                        characterPositions[i - runStart] = penX;
-                        codepoint = Character.toCodePoint(c, chars[i]);
-                    } else {
-                        // Either unexpected low surrogate or incomplete high surrogate, so this is a broken character
-                        codepoint = '\uFFFD'; // https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
-                    }
-                } else {
-                    codepoint = c;
-                    characterPositions[i - runStart] = penX;
-                }
-            }
-
-            // Slightly different from LTR variant because of different direction
-            final long checkpointValue = ((long) (i - runStart) << 32) | (glyphI & 0xFFFF_FFFFL);
             checkpoints[checkpointI++] = checkpointValue;
 
             // Normal glyph handling
@@ -390,12 +334,8 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
         BitmapFont.BitmapGlyph lastGlyph = findNextKerningGlyph(insertIndex, line, level, font);
 
-        // Attempt to optimize this method, as this method contains performance sensitive loop
-        if (ltr) {
-            addRunsFor_doAddGlyphsLtr(run, chars, runStart, runEnd, lastGlyph, characterPositions, font);
-        } else {
-            addRunsFor_doAddGlyphsRtl(run, chars, runStart, runEnd, lastGlyph, characterPositions, font);
-        }
+        // Contains performance sensitive loop and putting it into separate method measurably improves performance (desktop JRE)
+        addRunsFor_doAddGlyphs(run, chars, runStart, runEnd, lastGlyph, characterPositions, font, ltr);
 
         // Complete
         startX += run.width;
@@ -679,13 +619,11 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         }
     }
 
-    /**
-     * Returns character index of line-break point at which the characters should fold to next line.
+    /** Returns character index of line-break point at which the characters should fold to next line.
      * Character at index and following characters may be {@link #COLLAPSIBLE_SPACE}, in which case the linebreak should
      * be at the first character which is not that character.
      * @param hitIndex which should already be at the next line
-     * @return index in [lineStart, lineEnd) range
-     */
+     * @return index in [lineStart, lineEnd) range */
     private int findWrapPointFor(LayoutText<BitmapFont> text, final int lineStart, final int lineEnd, final int hitIndex) {
         assert hitIndex >= lineStart && hitIndex < lineEnd;
 
@@ -987,118 +925,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         }
 
         if (clampLines) {
-            final FloatArray lineHeights = this.lineHeights;
-
-            // Discard any line information about the last line or any following lines
-            if (getHeight() > availableHeight) {
-                // Convert to max lines problem
-                // Remove lines that overflow
-                while (lineHeights.size > 0 && lineHeights.items[lineHeights.size-1] > availableHeight) {
-                    lineHeights.size--;
-                }
-                // Now we know how many lines we can fit
-                maxLines = lineHeights.size;
-                // Discard lineHeight of the last (valid) line, because we will recompute it later
-                lineHeights.size--;
-            } else {
-                // Drop extra line heights
-                assert lineHeights.size >= maxLines - 1;
-                lineHeights.size = maxLines - 1;
-            }
-            line = maxLines - 1;
-
-            // Drop extra runs, if any
-            for (int i = runs.size-1; i >= 0; i--) {
-                GlyphRun<BitmapFont> run = runs.items[i];
-
-                if (run.line >= maxLines) {
-                    runs.items[i] = null;
-                    runs.size = i;
-                    GlyphRun.<BitmapFont>pool().free(run);
-                } else {
-                    if (run.line == maxLines - 1 && (run.characterFlags & GlyphRun.FLAG_LINEBREAK) != 0) {
-                        // This run is on a valid line, but it is a linebreak, so it has to go as well
-                        runs.items[i] = null;
-                        runs.size = i;
-                        GlyphRun.<BitmapFont>pool().free(run);
-                    }
-                    break;
-                }
-            }
-
-            // Update lineLaidRuns to a valid value, as it may be wrong and point to a different line
-            lineLaidRuns = runs.size;
-            while (lineLaidRuns > 0 && runs.items[lineLaidRuns - 1].line == line) {
-                lineLaidRuns--;
-            }
-
-            // Generate ellipsis and trim the last line to fit it
-            int ellipsisStart = runs.size;
-
-            // Reset startX, it may be in inconsistent state
-            if (ellipsisStart <= lineLaidRuns) {
-                startX = 0f;
-            } else {
-                final GlyphRun<BitmapFont> lastRun = runs.items[ellipsisStart - 1];
-                startX = lastRun.x + lastRun.width;
-            }
-
-            // Add the ellipsis run (no ellipsis = 0-width ellipsis with no runs)
-            final float ellipsisWidth;
-            if (ellipsis != null && !ellipsis.isEmpty()) {
-                final float startXBeforeEllipsis = startX;
-                addEllipsisRunFor(ellipsis, (byte) (text.isLeftToRight() ? 0 : 1),
-                        text.getInitialFont(), text.getInitialColor(), line, ellipsisStart);
-                ellipsisWidth = startX - startXBeforeEllipsis;
-            } else {
-                ellipsisWidth = 0f;
-            }
-
-            // Trim previous runs, so that ellipsis fits on the line width-wise
-            if (startX > availableWidth) {
-                // We need to trim
-                int trimmedIndex = ellipsisStart - 1;
-                GlyphRun<BitmapFont> trimmedRun;
-                while (trimmedIndex >= 0 && (trimmedRun = runs.items[trimmedIndex]).line == line) {
-                    if (trimmedRun.x + ellipsisWidth >= availableWidth) {
-                        // Even with this removed, ellipsis won't fit, so remove it
-                        startX = trimmedRun.x;
-                        GlyphRun.<BitmapFont>pool().free(trimmedRun);
-                        runs.removeIndex(trimmedIndex);
-                        ellipsisStart--;
-                        trimmedIndex--;
-                        continue;
-                    } else if (trimmedRun.x + trimmedRun.width + ellipsisWidth <= availableWidth) {
-                        // This somehow fits, don't do anything
-                        break;
-                    }
-                    // This run does not need to be removed, but we need to trim it
-                    startX = trimmedRun.x;
-                    final boolean trimmedRunLtr = trimmedRun.isLtr();
-                    int charactersEnd = charEndIndexForTargetRunWidth(trimmedRun, availableWidth - ellipsisWidth - trimmedRun.x);
-                    runs.removeIndex(trimmedIndex);
-                    ellipsisStart--;
-                    if (trimmedRunLtr ? charactersEnd <= trimmedRun.charactersStart : charactersEnd > trimmedRun.charactersEnd) {
-                        // Run has to be removed completely anyway
-                        break;
-                    } else {
-                        // Run can be re-added, with less characters
-                        ellipsisStart += addRunsFor(chars, trimmedRun.charactersStart, charactersEnd, trimmedRun.charactersLevel,
-                                trimmedRun.font, trimmedRun.color, trimmedRun.line, trimmedIndex);
-                    }
-                    GlyphRun.<BitmapFont>pool().free(trimmedRun);
-                }
-
-                // Reposition ellipsis according to current startX
-                for (int i = ellipsisStart; i < runs.size; i++) {
-                    GlyphRun<BitmapFont> ellipsisRun = runs.items[i];
-                    ellipsisRun.x = startX;
-                    startX += ellipsisRun.width;
-                }
-            }
-
-            // Re-complete the line
-            completeLine(text, lineLaidRuns, runs.size, text.getInitialFont());
+            clampExtraLines(text, availableWidth, availableHeight, maxLines, ellipsis);
         }
 
         final Array<BitmapFont> fonts = usedFonts;
@@ -1108,10 +935,128 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         fonts.clear();
     }
 
+    private void clampExtraLines(final LayoutText<BitmapFont> text, final float availableWidth, final float availableHeight,
+                                 int maxLines, final String ellipsis) {
+        final Array<GlyphRun<BitmapFont>> runs = this.runs;
+        final FloatArray lineHeights = this.lineHeights;
+
+        // Discard any line information about the last line or any following lines
+        if (getHeight() > availableHeight) {
+            // Convert to max lines problem
+            // Remove lines that overflow
+            while (lineHeights.size > 0 && lineHeights.items[lineHeights.size - 1] > availableHeight) {
+                lineHeights.size--;
+            }
+            // Now we know how many lines we can fit
+            maxLines = lineHeights.size;
+            // Discard lineHeight of the last (valid) line, because we will recompute it later
+            lineHeights.size--;
+        } else {
+            // Drop extra line heights
+            assert lineHeights.size >= maxLines - 1;
+            lineHeights.size = maxLines - 1;
+        }
+        final int lastAllowedLine = maxLines - 1;
+
+        // Drop extra runs, if any
+        for (int i = runs.size - 1; i >= 0; i--) {
+            GlyphRun<BitmapFont> run = runs.items[i];
+
+            if (run.line >= maxLines) {
+                runs.items[i] = null;
+                runs.size = i;
+                GlyphRun.<BitmapFont>pool().free(run);
+            } else {
+                if (run.line == maxLines - 1 && (run.characterFlags & GlyphRun.FLAG_LINEBREAK) != 0) {
+                    // This run is on a valid line, but it is a linebreak, so it has to go as well
+                    runs.items[i] = null;
+                    runs.size = i;
+                    GlyphRun.<BitmapFont>pool().free(run);
+                }
+                break;
+            }
+        }
+
+        // Update lineLaidRuns to a valid value, as it may be wrong and point to a different line
+        int lineLaidRuns = runs.size;
+        while (lineLaidRuns > 0 && runs.items[lineLaidRuns - 1].line == lastAllowedLine) {
+            lineLaidRuns--;
+        }
+
+        // Generate ellipsis and trim the last line to fit it
+        int ellipsisStart = runs.size;
+
+        // Reset startX, it may be in inconsistent state
+        if (ellipsisStart <= lineLaidRuns) {
+            startX = 0f;
+        } else {
+            final GlyphRun<BitmapFont> lastRun = runs.items[ellipsisStart - 1];
+            startX = lastRun.x + lastRun.width;
+        }
+
+        // Add the ellipsis run (no ellipsis = 0-width ellipsis with no runs)
+        final float ellipsisWidth;
+        if (ellipsis != null && !ellipsis.isEmpty()) {
+            final float startXBeforeEllipsis = startX;
+            addEllipsisRunFor(ellipsis, (byte) (text.isLeftToRight() ? 0 : 1),
+                    text.getInitialFont(), text.getInitialColor(), lastAllowedLine, ellipsisStart);
+            ellipsisWidth = startX - startXBeforeEllipsis;
+        } else {
+            ellipsisWidth = 0f;
+        }
+
+        // Trim previous runs, so that ellipsis fits on the line width-wise
+        if (startX > availableWidth) {
+            final char[] chars = text.text();
+
+            // We need to trim
+            int trimmedIndex = ellipsisStart - 1;
+            GlyphRun<BitmapFont> trimmedRun;
+            while (trimmedIndex >= 0 && (trimmedRun = runs.items[trimmedIndex]).line == lastAllowedLine) {
+                if (trimmedRun.x + ellipsisWidth >= availableWidth) {
+                    // Even with this removed, ellipsis won't fit, so remove it
+                    startX = trimmedRun.x;
+                    GlyphRun.<BitmapFont>pool().free(trimmedRun);
+                    runs.removeIndex(trimmedIndex);
+                    ellipsisStart--;
+                    trimmedIndex--;
+                    continue;
+                } else if (trimmedRun.x + trimmedRun.width + ellipsisWidth <= availableWidth) {
+                    // This somehow fits, don't do anything
+                    break;
+                }
+                // This run does not need to be removed, but we need to trim it
+                startX = trimmedRun.x;
+                final boolean trimmedRunLtr = trimmedRun.isLtr();
+                int charactersEnd = charEndIndexForTargetRunWidth(trimmedRun, availableWidth - ellipsisWidth - trimmedRun.x);
+                runs.removeIndex(trimmedIndex);
+                ellipsisStart--;
+                if (trimmedRunLtr ? charactersEnd <= trimmedRun.charactersStart : charactersEnd > trimmedRun.charactersEnd) {
+                    // Run has to be removed completely anyway
+                    break;
+                } else {
+                    // Run can be re-added, with less characters
+                    ellipsisStart += addRunsFor(chars, trimmedRun.charactersStart, charactersEnd, trimmedRun.charactersLevel,
+                            trimmedRun.font, trimmedRun.color, trimmedRun.line, trimmedIndex);
+                }
+                GlyphRun.<BitmapFont>pool().free(trimmedRun);
+            }
+
+            // Reposition ellipsis according to current startX
+            for (int i = ellipsisStart; i < runs.size; i++) {
+                GlyphRun<BitmapFont> ellipsisRun = runs.items[i];
+                ellipsisRun.x = startX;
+                startX += ellipsisRun.width;
+            }
+        }
+
+        // Re-complete the line
+        completeLine(text, lineLaidRuns, runs.size, text.getInitialFont());
+    }
+
     @Override
     public void clear() {
         super.clear();
-        usedFonts.clear();
         startX = 0f;
     }
 
