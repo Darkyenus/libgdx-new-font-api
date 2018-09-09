@@ -1,10 +1,9 @@
 package com.badlogic.gdx.graphics.text.bitmap;
 
 import com.badlogic.gdx.graphics.text.*;
-import com.badlogic.gdx.graphics.text.LayoutTextRunIterable.TextRun;
+import com.badlogic.gdx.graphics.text.LayoutTextRunArray.TextRun;
 import com.badlogic.gdx.graphics.text.util.CharArrayIterator;
 import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.utils.ByteArray;
 import com.badlogic.gdx.utils.FloatArray;
 import com.badlogic.gdx.utils.ObjectMap;
 
@@ -214,6 +213,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         runs.insert(insertIndex, run);
     }
 
+    // TODO(jp): Join LTR and RTL to one method and measure perf. impact
     private void addRunsFor_doAddGlyphsLtr(final GlyphRun<BitmapFont> run, final char[] chars, final int runStart, final int runEnd,
                                            BitmapFont.BitmapGlyph lastGlyph, final float[] characterPositions,
                                            final BitmapFont font) {
@@ -751,14 +751,11 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         int line = 0;
         int lineLaidRuns = 0;
 
-        boolean hadTextRuns = false;
         boolean clampLines = false;
 
-        final LayoutTextRunIterable<BitmapFont> iterable = LayoutTextRunIterable.obtain(text);
+        final LayoutTextRunArray<BitmapFont> textRuns = LayoutTextRunArray.obtain(text);
         forTextRuns:
-        for (TextRun<BitmapFont> textRun : iterable) {
-            hadTextRuns = true;
-
+        for (TextRun<BitmapFont> textRun : textRuns) {
             final int flags = textRun.flags;
             final boolean lastTextRun = (flags & TextRun.FLAG_LAST_RUN) != 0;
             boolean linebreak = (flags & TextRun.FLAG_LINE_BREAK) != 0;
@@ -1099,9 +1096,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             completeLine(text, lineLaidRuns, runs.size, text.getInitialFont());
         }
 
-        LayoutTextRunIterable.free(iterable);
-
-        if (hadTextRuns) {
+        if (textRuns.size > 0) {
             final Array<BitmapFont> fonts = usedFonts;
             for (BitmapFont font : fonts) {
                 font.prepareGlyphs();
@@ -1111,6 +1106,8 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             // At least one line must be always present, even if there is no text run
             addLineHeight(text.fontAt(0).lineHeight);
         }
+
+        LayoutTextRunArray.free(textRuns);
     }
 
     @Override
@@ -1139,33 +1136,5 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         }
         breakIterator.setText(charIterator);
         return breakIterator;
-    }
-
-    private static <T> void reverse(T[] items, int start, int end) {
-        for (int first = start, last = end - 1; first < last; first++, last--) {
-            T temp = items[first];
-            items[first] = items[last];
-            items[last] = temp;
-        }
-    }
-
-    private static ByteArray bidiLevelsFor_levelCache;
-
-    private static <F extends Font<F>> byte[] bidiLevelsFor(GlyphRun<F>[] runs, int runsStart, int runsEnd) {
-        ByteArray levels = bidiLevelsFor_levelCache;
-        final int runCount = runsEnd - runsStart;
-        if (levels == null) {
-            levels = bidiLevelsFor_levelCache = new ByteArray(true, runCount);
-        } else {
-            levels.size = 0;
-            levels.ensureCapacity(runCount);
-        }
-        levels.size = runCount;
-        final byte[] levelItems = levels.items;
-
-        for (int i = 0; i < runCount; i++) {
-            levelItems[i] = runs[runsStart + i].charactersLevel;
-        }
-        return levelItems;
     }
 }

@@ -1,6 +1,6 @@
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.text.*;
-import com.badlogic.gdx.graphics.text.LayoutTextRunIterable.TextRun;
+import com.badlogic.gdx.graphics.text.LayoutTextRunArray.TextRun;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.FloatArray;
 import com.badlogic.gdx.utils.IntArray;
@@ -87,7 +87,7 @@ public class TextLayoutIteratorTests {
             }
         }
 
-        final LayoutTextRunIterable<TestFont> runIterable = LayoutTextRunIterable.obtain(layoutText);
+        final LayoutTextRunArray<TestFont> runIterable = LayoutTextRunArray.obtain(layoutText);
 
         int i = 0;
         boolean firstRegion = true;
@@ -143,7 +143,7 @@ public class TextLayoutIteratorTests {
         }
         assertTrue(lastRegion || firstRegion, "Last run not set");
         assertEquals(textIndex, text.length);
-        LayoutTextRunIterable.free(runIterable);
+        LayoutTextRunArray.free(runIterable);
 
         if (i != expected.length) {
             fail("Done, but expected "+(expected.length - i)+" more item(s)");

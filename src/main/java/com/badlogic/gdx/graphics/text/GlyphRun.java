@@ -123,7 +123,7 @@ public final class GlyphRun<F extends Font<F>> implements Pool.Poolable {
     }
 
     public boolean isLtr() {
-        return LayoutTextRunIterable.TextRun.isLevelLtr(charactersLevel);
+        return LayoutTextRunArray.TextRun.isLevelLtr(charactersLevel);
     }
 
     public boolean isEllipsis() {

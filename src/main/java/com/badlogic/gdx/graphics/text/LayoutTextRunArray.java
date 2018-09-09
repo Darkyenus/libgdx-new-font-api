@@ -16,23 +16,25 @@ import java.util.Iterator;
  *     <li>Presence of <code>\n</code> or <code>\t</code></li>
  * </ul>
  */
-public final class LayoutTextRunIterable<F extends Font<F>> implements Iterable<LayoutTextRunIterable.TextRun<F>>, Pool.Poolable {
+public final class LayoutTextRunArray<F extends Font<F>> extends Array<LayoutTextRunArray.TextRun<F>> implements Pool.Poolable {
 
-    private final Array<TextRun<F>> textRuns = new Array<>(true, 10, TextRun.class);
+    public LayoutTextRunArray() {
+        super(true, 10, TextRun.class);
+    }
 
     /**Obtain iterable of runs in given text.
-     * Must be freed after use by {@link LayoutTextRunIterable#free(LayoutTextRunIterable)}.
+     * Must be freed after use by {@link LayoutTextRunArray#free(LayoutTextRunArray)}.
      *
      * @param text to iterate through */
-    public static <F extends Font<F>> LayoutTextRunIterable<F> obtain(LayoutText<F> text) {
+    public static <F extends Font<F>> LayoutTextRunArray<F> obtain(LayoutText<F> text) {
         @SuppressWarnings("unchecked")
-        final LayoutTextRunIterable<F> iterable = ITERABLE_POOL.obtain();
+        final LayoutTextRunArray<F> iterable = ITERABLE_POOL.obtain();
         iterable.setup(text);
         return iterable;
     }
 
     /** Free the given iterable. Do not use it after freeing. */
-    public static <F extends Font<F>> void free(LayoutTextRunIterable<F> iterable) {
+    public static <F extends Font<F>> void free(LayoutTextRunArray<F> iterable) {
         ITERABLE_POOL.free(iterable);
     }
 
@@ -82,18 +84,17 @@ public final class LayoutTextRunIterable<F extends Font<F>> implements Iterable<
                 assert false;
         }
 
-        textRuns.add(run);
+        add(run);
 
         return run.end - run.start;
     }
 
     /**
-     * Add {@link TextRun}s, which are in text in area from start to end, to {@link #textRuns}.
+     * Add {@link TextRun}s, which are in text in area from start to end.
      * @param level Bidi level of the area
      */
     private void addRuns(final LayoutText<F> text, final int start, final int end, final byte level) {
         assert start < end;
-        final Array<TextRun<F>> textRuns = this.textRuns;
 
         // Init
         int index = start;
@@ -144,7 +145,7 @@ public final class LayoutTextRunIterable<F extends Font<F>> implements Iterable<
             run.font = font;
             run.level = level;
             run.end = index = endIndex;
-            textRuns.add(run);
+            add(run);
 
             if (index < end) {
                 assert nextFont != null;
@@ -205,7 +206,6 @@ public final class LayoutTextRunIterable<F extends Font<F>> implements Iterable<
         }
 
         // Create runs
-        final Array<TextRun<F>> textRuns = this.textRuns;
         if (usedBidi == null) {
             // Simple variant
             final byte level = (byte) (allLtr ? 0 : 1);
@@ -256,11 +256,11 @@ public final class LayoutTextRunIterable<F extends Font<F>> implements Iterable<
             }
         }
 
-        if (textRuns.size > 0) {
-            textRuns.items[textRuns.size - 1].flags |= TextRun.FLAG_LAST_RUN;
+        if (size > 0) {
+            items[size - 1].flags |= TextRun.FLAG_LAST_RUN;
         }
 
-        assert assertLayoutRunsValid(textRuns);
+        assert assertLayoutRunsValid(this);
     }
 
     private static <F extends Font<F>> int regionEndIndex(LayoutText<F> text, int currentRegion) {
@@ -300,7 +300,7 @@ public final class LayoutTextRunIterable<F extends Font<F>> implements Iterable<
      */
     @Override
     public Iterator<TextRun<F>> iterator() {
-        return textRuns.iterator();
+        return super.iterator();
     }
 
     /**
@@ -309,8 +309,8 @@ public final class LayoutTextRunIterable<F extends Font<F>> implements Iterable<
     @SuppressWarnings("unchecked")
     @Override
     public void reset() {
-        RUN_POOL.freeAll((Array<TextRun>)(Array)textRuns);
-        textRuns.clear();
+        RUN_POOL.freeAll((Array<TextRun>)(Array)this);
+        this.clear();
     }
 
     /**
@@ -330,7 +330,9 @@ public final class LayoutTextRunIterable<F extends Font<F>> implements Iterable<
         public F font;
         /** Color used in this run */
         public float color;
-        /** If false, text should be laid out left-to-right. */
+        /** @see #FLAG_LINE_BREAK
+         * @see #FLAG_TAB_STOP
+         * @see #FLAG_LAST_RUN */
         public byte flags;
         /** Bidi level of the run. */
         public byte level;
@@ -353,5 +355,5 @@ public final class LayoutTextRunIterable<F extends Font<F>> implements Iterable<
         best case: maxRunLength * MAX */
     private static final Pool<TextRun> RUN_POOL = Pools.get(TextRun.class, 1024);
     /* Not exposed directly because of problems with generics */
-    private static final Pool<LayoutTextRunIterable> ITERABLE_POOL = Pools.get(LayoutTextRunIterable.class, 10);
+    private static final Pool<LayoutTextRunArray> ITERABLE_POOL = Pools.get(LayoutTextRunArray.class, 10);
 }

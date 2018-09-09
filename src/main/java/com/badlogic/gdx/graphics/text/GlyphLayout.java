@@ -596,4 +596,32 @@ public abstract class GlyphLayout<F extends Font<F>> {
             return -1;
         }
     }
+
+    protected static <T> void reverse(T[] items, int start, int end) {
+        for (int first = start, last = end - 1; first < last; first++, last--) {
+            T temp = items[first];
+            items[first] = items[last];
+            items[last] = temp;
+        }
+    }
+
+    private static ByteArray bidiLevelsFor_levelCache;
+
+    protected static <F extends Font<F>> byte[] bidiLevelsFor(GlyphRun<F>[] runs, int runsStart, int runsEnd) {
+        ByteArray levels = bidiLevelsFor_levelCache;
+        final int runCount = runsEnd - runsStart;
+        if (levels == null) {
+            levels = bidiLevelsFor_levelCache = new ByteArray(true, runCount);
+        } else {
+            levels.size = 0;
+            levels.ensureCapacity(runCount);
+        }
+        levels.size = runCount;
+        final byte[] levelItems = levels.items;
+
+        for (int i = 0; i < runCount; i++) {
+            levelItems[i] = runs[runsStart + i].charactersLevel;
+        }
+        return levelItems;
+    }
 }
