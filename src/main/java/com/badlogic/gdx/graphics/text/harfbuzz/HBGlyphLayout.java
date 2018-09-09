@@ -13,6 +13,7 @@ import java.text.Bidi;
 import java.util.Arrays;
 
 import static com.badlogic.gdx.graphics.text.harfbuzz.HarfBuzz.Font.NO_FEATURES;
+import static com.badlogic.gdx.graphics.text.harfbuzz.HarfBuzz.toFloat26_6;
 
 /**
  * Glyph layout for harf-buzz fonts.
@@ -23,6 +24,9 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
 
     /** Borrowed by BitmapGlyphLayout instances when they are doing glyph layout, to store all fonts in the layout. */
     private static final Array<HBFont> usedFonts = new Array<>(true, 10, HBFont.class);
+
+    /** Cached. */
+    private static final HarfBuzz.Buffer shapeBuffer = HarfBuzz.Buffer.create();
 
     private void addLineHeight(float height) {
         lineHeights.add(getHeight() + height);
@@ -98,7 +102,8 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
     private static final IntArray addRunsForTextRuns_glyphPositions = new IntArray();
 
     private void addRunsForTextRuns(LayoutText<HBFont> text, LayoutTextRunArray<HBFont> textRuns, int start, int end, int line, boolean paragraphBegin, boolean paragraphEnd) {
-        final HarfBuzz.Buffer shapeBuffer = HarfBuzz.Buffer.create();//TODO allocation
+        final HarfBuzz.Buffer shapeBuffer = HBGlyphLayout.shapeBuffer;
+        shapeBuffer.reset();
 
         // Set flags and properties
         {
@@ -137,7 +142,9 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
         shapeBuffer.setDirection(TextRun.isLevelLtr(firstTextRun.level) ? HarfBuzz.Direction.LTR : HarfBuzz.Direction.RTL);
 
         // Shape with default features
-        firstTextRun.font.hbFont.shape(shapeBuffer, NO_FEATURES);// TODO(jp): Examine what features can/should we use
+        final HBFont font = firstTextRun.font;
+        final float densityScale = font.densityScale;
+        font.hbFont.shape(shapeBuffer, NO_FEATURES);// TODO(jp): Examine what features can/should we use
 
         // Create runs
         final int shapedGlyphCount = shapeBuffer.getLength();
@@ -173,9 +180,9 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
             final int glyphFlags = glyphInfo[gi + 1];
             final int originalIndex = glyphInfo[gi + 2];
 
-            final int xAdvance = glyphPositions[gp]; // TODO(jp): * densityScale?
-            final int xOffset = glyphPositions[gp + 2];
-            final int yOffset = glyphPositions[gp + 3];
+            final float xAdvance = toFloat26_6(glyphPositions[gp]) * densityScale;
+            final float xOffset = toFloat26_6(glyphPositions[gp + 2]) * densityScale;
+            final float yOffset = toFloat26_6(glyphPositions[gp + 3]) * densityScale;
 
             while (originalIndex >= currentTextRun.end) {
                 currentGlyphRun.width = penX;
@@ -200,12 +207,10 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
                 currentGlyphRun.charactersEnd = currentTextRun.end;
                 characterPositions = currentGlyphRun.characterPositions.ensureCapacity(currentTextRun.end - currentTextRun.start);
                 currentGlyphRun.characterPositions.size = currentTextRun.end - currentTextRun.start;
+                c = 0;
             }
 
-            penX += xAdvance;
-
             currentGlyphRun.createCheckpoint(originalIndex, currentGlyphRun.glyphs.size);
-
             currentGlyphRun.glyphs.add(currentTextRun.font.getGlyph(glyphId));
             currentGlyphRun.glyphX.add(penX + xOffset);
             currentGlyphRun.glyphY.add(yOffset);
@@ -215,6 +220,8 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
             while (c < newC) {
                 characterPositions[c++] = Float.NaN;
             }
+
+            penX += xAdvance;
         }
 
         currentGlyphRun.width = penX;
@@ -222,8 +229,6 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
             characterPositions[c++] = Float.NaN;
         }
         startX += penX;
-
-        shapeBuffer.destroy();
     }
 
     /** Reorders run according to BiDi algorithm, computes line height, sets Y of runs on the line,
@@ -639,6 +644,7 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
         } else {
             // Drop extra line heights
             assert lineHeights.size >= maxLines - 1;
+            // Last line will be added later
             lineHeights.size = maxLines - 1;
         }
         final int lastAllowedLine = maxLines - 1;
@@ -681,7 +687,7 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
 
         // Add the ellipsis run (no ellipsis = 0-width ellipsis with no runs)
         final float ellipsisWidth;
-        if (ellipsis != null && !ellipsis.isEmpty()) {
+        if (!ellipsis.isEmpty()) {
             final float startXBeforeEllipsis = startX;
             // TODO(jp): Implement
             /*addEllipsisRunFor(ellipsis, (byte) (text.isLeftToRight() ? 0 : 1),

@@ -1681,4 +1681,8 @@ public final class HarfBuzz {
 			return getClass().getSimpleName()+"@"+addr;
 		}
 	}
+
+	public static float toFloat26_6(int fixedPoint26_6) {
+		return fixedPoint26_6 / 64f;
+	}
 }

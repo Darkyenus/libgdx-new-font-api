@@ -34,7 +34,7 @@ public class HBFont implements Font<HBFont> {
     private final ImagePacker packer;
     private final Comparator<Glyph> packerComparator;
 
-    private final float densityScale;
+    public final float densityScale;
 
     private final Array<Texture> textures = new Array<>(true, 4, Texture.class);
     private final HBGlyph[] glyphs;
@@ -75,14 +75,14 @@ public class HBFont implements Font<HBFont> {
         // TODO(jp): Following is probably wrong because of wrong units
 
         if (face.loadChar(' ', FreeType.FT_LOAD_DEFAULT)) {
-            spaceXAdvance = face.getGlyph().getAdvanceX() * densityScale;
+            spaceXAdvance = FreeType.toInt(face.getGlyph().getAdvanceX()) * densityScale;
         } else {
-            spaceXAdvance = face.getMaxAdvanceWidth() * densityScale;
+            spaceXAdvance = FreeType.toInt(face.getMaxAdvanceWidth()) * densityScale;
         }
 
         final FreeType.SizeMetrics metrics = face.getSize().getMetrics();
-        lineHeight = metrics.getHeight();
-        base = metrics.getAscender();
+        lineHeight = FreeType.toInt(metrics.getHeight()) * densityScale;
+        base = FreeType.toInt(metrics.getAscender()) * densityScale;
     }
 
     @Override
@@ -281,11 +281,13 @@ public class HBFont implements Font<HBFont> {
         }
         */
 
+        resultGlyph.unpackedPixmap = mainPixmap;
+
+        final float densityScale = this.densityScale;
         resultGlyph.width = mainPixmap.getWidth() * densityScale;
         resultGlyph.height = mainPixmap.getHeight() * densityScale;
-        resultGlyph.xOffset = mainGlyph.getLeft();
-        resultGlyph.yOffset = mainGlyph.getTop();// TODO(jp): Correct? Possibly needs density scale or maybe even /64
-        resultGlyph.unpackedPixmap = mainPixmap;
+        resultGlyph.xOffset = mainGlyph.getLeft() * densityScale;
+        resultGlyph.yOffset = -(mainPixmap.getHeight() - mainGlyph.getTop()) * densityScale;
 
         mainGlyph.dispose();
         return resultGlyph;

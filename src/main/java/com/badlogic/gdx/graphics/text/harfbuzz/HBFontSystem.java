@@ -27,6 +27,7 @@ public class HBFontSystem implements FontSystem<HBGlyphLayout>, Disposable {
     private final FreeType.Library freeTypeLibrary;
 
     public HBFontSystem() {
+        HarfBuzz.initialize();
         this.freeTypeLibrary = FreeType.initFreeType();
     }
 

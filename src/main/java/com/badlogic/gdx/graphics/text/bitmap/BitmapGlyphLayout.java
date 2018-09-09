@@ -954,6 +954,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
         } else {
             // Drop extra line heights
             assert lineHeights.size >= maxLines - 1;
+            // Last line will be added later
             lineHeights.size = maxLines - 1;
         }
         final int lastAllowedLine = maxLines - 1;
@@ -996,7 +997,7 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
         // Add the ellipsis run (no ellipsis = 0-width ellipsis with no runs)
         final float ellipsisWidth;
-        if (ellipsis != null && !ellipsis.isEmpty()) {
+        if (!ellipsis.isEmpty()) {
             final float startXBeforeEllipsis = startX;
             addEllipsisRunFor(ellipsis, (byte) (text.isLeftToRight() ? 0 : 1),
                     text.getInitialFont(), text.getInitialColor(), lastAllowedLine, ellipsisStart);
