@@ -353,16 +353,14 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
     }
 
     @Override
-    protected void doLayoutText(LayoutText<HBFont> text, float availableWidth, float availableHeight, int maxLines, String ellipsis) {
+    protected void doLayoutText(LayoutText<HBFont> text, LayoutTextRunArray<HBFont> textRuns, float availableWidth, float availableHeight, int maxLines, String ellipsis) {
         final Array<GlyphRun<HBFont>> runs = this.runs;
-        final char[] chars = text.text();
 
         int line = 0;
         int lineLaidRuns = 0;
 
         boolean clampLines = false;
 
-        final LayoutTextRunArray<HBFont> textRuns = LayoutTextRunArray.obtain(text);
         if (textRuns.size <= 0) {
             // At least one line must be always present, even if there is no text run
             addLineHeight(text.fontAt(0).lineHeight);
@@ -727,8 +725,6 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
             // Re-complete the line
             completeLine(text, lineLaidRuns, runs.size, text.getInitialFont());
         }
-
-        LayoutTextRunArray.free(textRuns);
 
         final Array<HBFont> fonts = usedFonts;
         for (HBFont font : fonts) {

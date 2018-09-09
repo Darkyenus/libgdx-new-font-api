@@ -744,7 +744,13 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
     }
 
     @Override
-    protected void doLayoutText(LayoutText<BitmapFont> text, float availableWidth, float availableHeight, int maxLines, String ellipsis) {
+    protected void doLayoutText(LayoutText<BitmapFont> text, LayoutTextRunArray<BitmapFont> textRuns, float availableWidth, float availableHeight, int maxLines, String ellipsis) {
+        if (textRuns.size <= 0) {
+            // At least one line must be always present, even if there is no text run
+            addLineHeight(text.fontAt(0).lineHeight);
+            return;
+        }
+
         final Array<GlyphRun<BitmapFont>> runs = this.runs;
         final char[] chars = text.text();
 
@@ -753,7 +759,6 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
         boolean clampLines = false;
 
-        final LayoutTextRunArray<BitmapFont> textRuns = LayoutTextRunArray.obtain(text);
         forTextRuns:
         for (TextRun<BitmapFont> textRun : textRuns) {
             final int flags = textRun.flags;
@@ -1096,18 +1101,11 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
             completeLine(text, lineLaidRuns, runs.size, text.getInitialFont());
         }
 
-        if (textRuns.size > 0) {
-            final Array<BitmapFont> fonts = usedFonts;
-            for (BitmapFont font : fonts) {
-                font.prepareGlyphs();
-            }
-            fonts.clear();
-        } else {
-            // At least one line must be always present, even if there is no text run
-            addLineHeight(text.fontAt(0).lineHeight);
+        final Array<BitmapFont> fonts = usedFonts;
+        for (BitmapFont font : fonts) {
+            font.prepareGlyphs();
         }
-
-        LayoutTextRunArray.free(textRuns);
+        fonts.clear();
     }
 
     @Override

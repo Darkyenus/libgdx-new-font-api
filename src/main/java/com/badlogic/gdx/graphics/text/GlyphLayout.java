@@ -59,7 +59,12 @@ public abstract class GlyphLayout<F extends Font<F>> {
             ellipsis = "";
         }
 
-        doLayoutText(text, availableWidth, availableHeight, maxLines, ellipsis);
+        final LayoutTextRunArray<F> textRuns = LayoutTextRunArray.obtain(text);
+        try {
+            doLayoutText(text, textRuns, availableWidth, availableHeight, maxLines, ellipsis);
+        } finally {
+            LayoutTextRunArray.free(textRuns);
+        }
 
         // Build charRuns and layout width
         final IntArray charRuns = this.charRuns;
@@ -153,7 +158,7 @@ public abstract class GlyphLayout<F extends Font<F>> {
      * @param maxLines positive, possibly {@link Integer#MAX_VALUE}
      * @param ellipsis never null, possibly empty
      */
-    protected abstract void doLayoutText(LayoutText<F> text, float availableWidth, float availableHeight, int maxLines, String ellipsis);
+    protected abstract void doLayoutText(LayoutText<F> text, LayoutTextRunArray<F> textRuns, float availableWidth, float availableHeight, int maxLines, String ellipsis);
 
     private boolean assertCharRunsValid(IntArray charRuns) {
         int lastCharStart = -1;
