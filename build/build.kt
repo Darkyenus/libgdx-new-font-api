@@ -12,7 +12,6 @@ import com.darkyen.resourcepacker.PreferSymlinks
 import wemi.Archetypes
 import wemi.Keys
 import wemi.WemiException
-import wemi.collections.toMutable
 import wemi.compile.JavaCompilerFlags.customFlags
 import wemi.dependency.Repository.M2.Companion.Classifier
 import wemi.util.LocatedPath
@@ -40,9 +39,6 @@ val experimentation by project(Archetypes.JavaProject) {
     libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-platform", gdxVersion, Classifier to "natives-desktop") }
     libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-freetype", gdxVersion) }
     libraryDependencies add { dependency("com.badlogicgames.gdx", "gdx-freetype-platform", gdxVersion, Classifier to "natives-desktop") }
-
-    // For proper bidi algorithm and breaking and stuff.
-    libraryDependencies add { dependency("com.ibm.icu:icu4j:62.1") }
 
     extend (compilingJava) {
         compilerOptions[customFlags] += "-Xlint:unchecked"
@@ -205,6 +201,7 @@ val experimentation by project(Archetypes.JavaProject) {
         mac.headerDirs += path("harfbuzz/include").absolutePath
         mac.headerDirs += "/usr/local/include/freetype2/"
         mac.libraries += " -lharfbuzz"
+        mac.libraries += " -lfreetype"
         mac.linkerFlags += " -L${path("harfbuzz/lib").absolutePath}"
 
         val buildConfig = BuildConfig("harfbuzz")

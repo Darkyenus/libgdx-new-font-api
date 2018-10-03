@@ -31,9 +31,12 @@ import java.util.Locale;
  *     text.addRegion(3, myFont, Color.RED.toFloatBits());
  * }</pre></blockquote>
  *
+ * <p><i>Note</i>: This implements CharSequence, but only in terms of actual characters.
+ * No extra data take part in its implementation.</p>
+ *
  * @see com.badlogic.gdx.graphics.text.util.MarkupLayoutText
  */
-public class LayoutText<F extends Font<F>> implements Pool.Poolable {
+public class LayoutText<F extends Font<F>> implements CharSequence, Pool.Poolable {
 
     public static final char[] NO_TEXT = new char[0];
 
@@ -159,6 +162,22 @@ public class LayoutText<F extends Font<F>> implements Pool.Poolable {
      * @see #length() for the valid range */
     public final char[] text() {
         return this.text;
+    }
+
+    @Override
+    public char charAt(int index) {
+        if (index < 0 || index > length) {
+            throw new IndexOutOfBoundsException(index+" not in [0, "+length+")");
+        }
+        return text[index];
+    }
+
+    @Override
+    public String subSequence(int start, int end) {
+        if (start < 0 || start > end || end > length) {
+            throw new IndexOutOfBoundsException("["+start+", "+end+") not in [0, "+length+")");
+        }
+        return new String(text, start, end - start);
     }
 
     /** @return number of valid indices from the start of {@link #text()}, i.e. length of the text. */
@@ -323,5 +342,12 @@ public class LayoutText<F extends Font<F>> implements Pool.Poolable {
             return i;
         }
         return -i - 2;
+    }
+
+    /** @return characters as string
+     * @see #text() */
+    @Override
+    public String toString() {
+        return new String(this.text, 0, this.length);
     }
 }

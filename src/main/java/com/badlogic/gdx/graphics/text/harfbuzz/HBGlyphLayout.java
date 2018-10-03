@@ -10,15 +10,22 @@ import com.badlogic.gdx.utils.FloatArray;
 import com.badlogic.gdx.utils.IntArray;
 
 import java.text.Bidi;
-import java.util.Arrays;
+import java.text.BreakIterator;
+import java.util.Locale;
 
+import static com.badlogic.gdx.graphics.text.GlyphRun.FLAG_ELLIPSIS;
+import static com.badlogic.gdx.graphics.text.harfbuzz.HarfBuzz.Buffer.HB_GLYPH_FLAG_UNSAFE_TO_BREAK;
 import static com.badlogic.gdx.graphics.text.harfbuzz.HarfBuzz.Font.NO_FEATURES;
-import static com.badlogic.gdx.graphics.text.harfbuzz.HarfBuzz.toFloat26_6;
+import static com.badlogic.gdx.graphics.text.harfbuzz.HarfBuzz.toFloatFrom26p6;
 
 /**
  * Glyph layout for harf-buzz fonts.
  */
 public class HBGlyphLayout extends GlyphLayout<HBFont> {
+
+    private static final byte FLAG_GLYPH_RUN_HAS_COLLAPSED_SPACES = (byte) (1 << 6);
+    private static final byte FLAG_GLYPH_RUN_IS_PARAGRAPH_START = (byte) (1 << 5);
+    private static final byte FLAG_GLYPH_RUN_IS_PARAGRAPH_END = (byte) (1 << 4);
 
     private float startX;
 
@@ -98,51 +105,29 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
         runs.add(run);
     }
 
-    private static final IntArray addRunsForTextRuns_glyphInfo = new IntArray();
-    private static final IntArray addRunsForTextRuns_glyphPositions = new IntArray();
-
-    private void addRunsForTextRuns(LayoutText<HBFont> text, LayoutTextRunArray<HBFont> textRuns, int start, int end, int line, boolean paragraphBegin, boolean paragraphEnd) {
+    private void addEllipsisRunFor(String chars, final byte level,
+                                   final HBFont font, final float color, final int line, int insertIndex) {
         final HarfBuzz.Buffer shapeBuffer = HBGlyphLayout.shapeBuffer;
         shapeBuffer.reset();
 
         // Set flags and properties
         {
             shapeBuffer.setContentType(HarfBuzz.Buffer.ContentType.UNICODE);
-            shapeBuffer.setClusterLevel(HarfBuzz.Buffer.ClusterLevel.MONOTONE_CHARACTERS);
 
             int runFlags = HarfBuzz.Buffer.HB_BUFFER_FLAG_DEFAULT;
-            if (paragraphBegin) {
-                runFlags |= HarfBuzz.Buffer.HB_BUFFER_FLAG_BOT;
-            }
-            if (paragraphEnd) {
-                runFlags |= HarfBuzz.Buffer.HB_BUFFER_FLAG_EOT;
-            }
+            runFlags |= HarfBuzz.Buffer.HB_BUFFER_FLAG_BOT;
+            runFlags |= HarfBuzz.Buffer.HB_BUFFER_FLAG_EOT;
             shapeBuffer.setFlags(runFlags);
         }
 
-        final TextRun<HBFont> firstTextRun = textRuns.get(start);
 
         // Add the text to the buffer
-        {
-            int i = start;
-            TextRun<HBFont> textRun = firstTextRun;
-            while (true) {
-                shapeBuffer.add(text.text(),
-                        0, text.length(),
-                        textRun.start, textRun.end - textRun.start);
-
-                if (++i >= end) {
-                    break;
-                }
-                textRun = textRuns.get(i);
-            }
-        }
+        shapeBuffer.add(chars, 0, chars.length(), 0, chars.length());
 
         shapeBuffer.guessSegmentProperties();
-        shapeBuffer.setDirection(TextRun.isLevelLtr(firstTextRun.level) ? HarfBuzz.Direction.LTR : HarfBuzz.Direction.RTL);
+        shapeBuffer.setDirection(TextRun.isLevelLtr(level) ? HarfBuzz.Direction.LTR : HarfBuzz.Direction.RTL);
 
         // Shape with default features
-        final HBFont font = firstTextRun.font;
         final float densityScale = font.densityScale;
         font.hbFont.shape(shapeBuffer, NO_FEATURES);// TODO(jp): Examine what features can/should we use
 
@@ -159,76 +144,163 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
         assert shapedGlyphCount * 4 == glyphPositionsArray.size;
         final int[] glyphPositions = glyphPositionsArray.items;
 
-        TextRun<HBFont> currentTextRun = firstTextRun;
-        int currentTextRunIndex = start;
         GlyphRun<HBFont> currentGlyphRun = GlyphRun.obtain(true);
-        runs.add(currentGlyphRun);
         currentGlyphRun.x = startX;
         currentGlyphRun.line = line;
-        currentGlyphRun.font = currentTextRun.font;
-        currentGlyphRun.color = currentTextRun.color;
-        currentGlyphRun.charactersLevel = currentTextRun.level;
-        currentGlyphRun.charactersStart = currentTextRun.start;
-        currentGlyphRun.charactersEnd = currentTextRun.end;
-        float[] characterPositions = currentGlyphRun.characterPositions.ensureCapacity(currentTextRun.end - currentTextRun.start);
-        currentGlyphRun.characterPositions.size = currentTextRun.end - currentTextRun.start;
+        currentGlyphRun.font = font;
+        currentGlyphRun.color = color;
+        currentGlyphRun.charactersLevel = level;
+        currentGlyphRun.charactersStart = -1;
+        currentGlyphRun.charactersEnd = -1;
+        currentGlyphRun.characterFlags |= FLAG_ELLIPSIS;
+
+        final float fontBase = font.base;
 
         float penX = 0f;
-        int c = 0;
         for (int i = 0, gi = 0, gp = 0; i < shapedGlyphCount; i++, gi += 3, gp += 4) {
             final int glyphId = glyphInfo[gi];
             final int glyphFlags = glyphInfo[gi + 1];
             final int originalIndex = glyphInfo[gi + 2];
 
-            final float xAdvance = toFloat26_6(glyphPositions[gp]) * densityScale;
-            final float xOffset = toFloat26_6(glyphPositions[gp + 2]) * densityScale;
-            final float yOffset = toFloat26_6(glyphPositions[gp + 3]) * densityScale;
+            final float xAdvance = toFloatFrom26p6(glyphPositions[gp]) * densityScale;
+            final float xOffset = toFloatFrom26p6(glyphPositions[gp + 2]) * densityScale;
+            final float yOffset = toFloatFrom26p6(glyphPositions[gp + 3]) * densityScale;
 
-            while (originalIndex >= currentTextRun.end) {
-                currentGlyphRun.width = penX;
-                startX += penX;
-                penX = 0f;
+            if ((glyphFlags & HB_GLYPH_FLAG_UNSAFE_TO_BREAK) == 0) {
+                currentGlyphRun.createCheckpoint(originalIndex, currentGlyphRun.glyphs.size);
+            }
+            currentGlyphRun.glyphs.add(font.getGlyph(glyphId));
+            currentGlyphRun.glyphX.add(penX + xOffset);
+            currentGlyphRun.glyphY.add(yOffset - fontBase);
 
-                while (c < currentGlyphRun.characterPositions.size) {
+            penX += xAdvance;
+        }
+
+        currentGlyphRun.width = penX;
+
+        startX += penX;
+        runs.insert(insertIndex, currentGlyphRun);
+    }
+
+    private static final IntArray addRunsForTextRuns_glyphInfo = new IntArray();
+    private static final IntArray addRunsForTextRuns_glyphPositions = new IntArray();
+
+    private int addRunsFor(final char[] chars, final int charsLength, final int runStart, final int runEnd, final byte level,
+                           final HBFont font, final float color, final int line, int insertIndex,
+                           boolean paragraphStart, boolean paragraphEnd) {
+        final HarfBuzz.Buffer shapeBuffer = HBGlyphLayout.shapeBuffer;
+        shapeBuffer.reset();
+
+        // Set flags and properties
+        {
+            shapeBuffer.setContentType(HarfBuzz.Buffer.ContentType.UNICODE);
+            shapeBuffer.setClusterLevel(HarfBuzz.Buffer.ClusterLevel.MONOTONE_CHARACTERS);
+
+            int runFlags = HarfBuzz.Buffer.HB_BUFFER_FLAG_DEFAULT;
+            if (paragraphStart) {
+                runFlags |= HarfBuzz.Buffer.HB_BUFFER_FLAG_BOT;
+            }
+            if (paragraphEnd) {
+                runFlags |= HarfBuzz.Buffer.HB_BUFFER_FLAG_EOT;
+            }
+            shapeBuffer.setFlags(runFlags);
+        }
+
+
+        // Add the text to the buffer
+        shapeBuffer.add(chars,
+                0, charsLength,
+                runStart, runEnd - runStart);
+
+        shapeBuffer.guessSegmentProperties();
+        final boolean ltr = TextRun.isLevelLtr(level);
+        shapeBuffer.setDirection(ltr ? HarfBuzz.Direction.LTR : HarfBuzz.Direction.RTL);
+
+        // Shape with default features
+        final float densityScale = font.densityScale;
+        font.hbFont.shape(shapeBuffer, NO_FEATURES);// TODO(jp): Examine what features can/should we use
+
+        // Create runs
+        final int shapedGlyphCount = shapeBuffer.getLength();
+
+        final IntArray glyphInfoArray = HBGlyphLayout.addRunsForTextRuns_glyphInfo;
+        shapeBuffer.getGlyphInfos(glyphInfoArray);
+        assert shapedGlyphCount * 3 == glyphInfoArray.size;
+        final int[] glyphInfo = glyphInfoArray.items;
+
+        final IntArray glyphPositionsArray = HBGlyphLayout.addRunsForTextRuns_glyphPositions;
+        shapeBuffer.getGlyphPositions(glyphPositionsArray);
+        assert shapedGlyphCount * 4 == glyphPositionsArray.size;
+        final int[] glyphPositions = glyphPositionsArray.items;
+
+        GlyphRun<HBFont> currentGlyphRun = GlyphRun.obtain(true);
+        currentGlyphRun.x = startX;
+        currentGlyphRun.line = line;
+        currentGlyphRun.font = font;
+        currentGlyphRun.color = color;
+        if (paragraphStart) {
+            currentGlyphRun.characterFlags |= FLAG_GLYPH_RUN_IS_PARAGRAPH_START;
+        }
+        if (paragraphEnd) {
+            currentGlyphRun.characterFlags |= FLAG_GLYPH_RUN_IS_PARAGRAPH_END;
+        }
+        currentGlyphRun.charactersLevel = level;
+        currentGlyphRun.charactersStart = runStart;
+        currentGlyphRun.charactersEnd = runEnd;
+        final int characterCount = runEnd - runStart;
+        float[] characterPositions = currentGlyphRun.characterPositions.ensureCapacity(characterCount);
+        currentGlyphRun.characterPositions.size = characterCount;
+
+        final float fontBase = font.base;
+
+        float penX = 0f;
+        int c = ltr ? 0 : characterCount-1;
+        for (int i = 0, gi = 0, gp = 0; i < shapedGlyphCount; i++, gi += 3, gp += 4) {
+            final int glyphId = glyphInfo[gi];
+            final int glyphFlags = glyphInfo[gi + 1];
+            final int originalIndex = glyphInfo[gi + 2];
+
+            final float xAdvance = toFloatFrom26p6(glyphPositions[gp]) * densityScale;
+            final float xOffset = toFloatFrom26p6(glyphPositions[gp + 2]) * densityScale;
+            final float yOffset = toFloatFrom26p6(glyphPositions[gp + 3]) * densityScale;
+
+            if ((glyphFlags & HB_GLYPH_FLAG_UNSAFE_TO_BREAK) == 0) {
+                currentGlyphRun.createCheckpoint(originalIndex, currentGlyphRun.glyphs.size);
+            }
+            currentGlyphRun.glyphs.add(font.getGlyph(glyphId));
+            currentGlyphRun.glyphX.add(penX + xOffset);
+            currentGlyphRun.glyphY.add(yOffset - fontBase);
+
+            final int newC = originalIndex - runStart;
+            if (ltr) {
+                characterPositions[c++] = penX;
+                while (c < newC) {
                     characterPositions[c++] = Float.NaN;
                 }
-
-                currentTextRunIndex++;
-                assert currentTextRunIndex < end;
-                currentTextRun = textRuns.get(currentTextRunIndex);
-                currentGlyphRun = GlyphRun.obtain(true);
-                runs.add(currentGlyphRun);
-                currentGlyphRun.x = startX;
-                currentGlyphRun.line = line;
-                currentGlyphRun.font = currentTextRun.font;
-                currentGlyphRun.color = currentTextRun.color;
-                currentGlyphRun.charactersLevel = currentTextRun.level;
-                currentGlyphRun.charactersStart = currentTextRun.start;
-                currentGlyphRun.charactersEnd = currentTextRun.end;
-                characterPositions = currentGlyphRun.characterPositions.ensureCapacity(currentTextRun.end - currentTextRun.start);
-                currentGlyphRun.characterPositions.size = currentTextRun.end - currentTextRun.start;
-                c = 0;
-            }
-
-            currentGlyphRun.createCheckpoint(originalIndex, currentGlyphRun.glyphs.size);
-            currentGlyphRun.glyphs.add(currentTextRun.font.getGlyph(glyphId));
-            currentGlyphRun.glyphX.add(penX + xOffset);
-            currentGlyphRun.glyphY.add(yOffset);
-
-            final int newC = originalIndex - currentTextRun.start;
-            characterPositions[c++] = penX;
-            while (c < newC) {
-                characterPositions[c++] = Float.NaN;
+            } else {
+                while (c > newC) {
+                    characterPositions[c--] = Float.NaN;
+                }
+                characterPositions[c--] = penX;
             }
 
             penX += xAdvance;
         }
 
         currentGlyphRun.width = penX;
-        while (c < currentGlyphRun.characterPositions.size) {
-            characterPositions[c++] = Float.NaN;
+        if (ltr) {
+            while (c < currentGlyphRun.characterPositions.size) {
+                characterPositions[c++] = Float.NaN;
+            }
+        } else {
+            while (c >= 0) {
+                characterPositions[c--] = Float.NaN;
+            }
         }
+
         startX += penX;
+        runs.insert(insertIndex, currentGlyphRun);
+        return 1;
     }
 
     /** Reorders run according to BiDi algorithm, computes line height, sets Y of runs on the line,
@@ -328,13 +400,6 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
 
             final float fontBase = run.font.base;
             run.y = lineStartY - topToBaseline + fontBase;
-
-            // Fill the glyphY here
-            // (it is always one constant value, based on the font, and doing it earlier may lead to copying around
-            // extra values when wrapping)
-            final int glyphCount = run.glyphX.size;
-            Arrays.fill(run.glyphY.ensureCapacity(glyphCount), 0, glyphCount, -fontBase);
-            run.glyphY.size = glyphCount;
         }
 
         addLineHeight(finalLineHeight);
@@ -342,19 +407,230 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
         startX = 0f;
     }
 
-    private static int findRunGroupEnd(LayoutTextRunArray<HBFont> textRuns, int start) {
-        final TextRun<HBFont> first = textRuns.get(start);
-        int end = start + 1;
-        while (end < textRuns.size) {
-            final TextRun<HBFont> next = textRuns.get(end);
-            if (first.level != next.level
-                    || first.font != next.font
-                    || (next.flags & (TextRun.FLAG_TAB_STOP | TextRun.FLAG_LINE_BREAK)) != 0) {
-                break;
+    private int runIndexWithCharIndex(int fromRunIndex, int charIndex) {
+        final Array<GlyphRun<HBFont>> runs = this.runs;
+        assert fromRunIndex < runs.size && fromRunIndex >= 0;
+
+        for (int i = fromRunIndex; i < runs.size; i++) {
+            if (charIndex < runs.items[i].charactersEnd) {
+                return i;
             }
-            end++;
         }
-        return end;
+
+        return runs.size;
+    }
+
+    /** @return {@link GlyphRun#charactersEnd} value with which the run would have to be constructed with,
+     * so that its {@link GlyphRun#width} would be <= <code>runWidth</code>. */
+    private int charEndIndexForTargetRunWidth(GlyphRun<HBFont> run, float targetRunWidth) {
+        final int charPositionCount = run.characterPositions.size;
+        final float[] charPositions = run.characterPositions.items;
+
+        int characterIndexInWrapRun = 0;
+        if (run.isLtr()) {
+            for (int i = 0; i < charPositionCount; i++) {
+                final float position = charPositions[i];
+                if (Float.isNaN(position)) {
+                    continue;
+                }
+                if (position >= targetRunWidth) {
+                    break;
+                }
+                characterIndexInWrapRun = i;
+            }
+        } else {
+            final float runWidth = run.width;
+            for (int i = 0; i < charPositionCount; i++) {
+                float position = charPositions[i];
+                if (Float.isNaN(position)) {
+                    continue;
+                }
+
+                position = runWidth - position;
+
+                if (position >= targetRunWidth) {
+                    break;
+                }
+                characterIndexInWrapRun = i;
+            }
+        }
+        return run.charactersStart + characterIndexInWrapRun;
+    }
+
+    private int splitRunForWrap(final char[] chars, final int charsLength, final int runIndex, int splitIndex) {
+        final Array<GlyphRun<HBFont>> runs = this.runs;
+
+        if (runIndex >= runs.size) {
+            return runs.size;
+        } else if (runIndex < 0) {
+            return 0;
+        }
+
+        final GlyphRun<HBFont> splitRun = runs.items[runIndex];
+        // No splitting necessary?
+        if (splitIndex <= splitRun.charactersStart) {
+            return runIndex;
+        } else if (splitIndex >= splitRun.charactersEnd
+                || (splitRun.characterFlags & (GlyphRun.FLAG_LINEBREAK | GlyphRun.FLAG_TAB)) != 0) {
+            // No splitting necessary
+            return runIndex + 1;
+        }
+
+        assert splitRun.checkpoints != null;
+
+        final int runSplitCharacterIndex = splitIndex - splitRun.charactersStart;
+        final int runSplitCheckpointIndex = splitRun.getCheckpointIndexOfCharacter(runSplitCharacterIndex);
+
+        if (runSplitCheckpointIndex >= 0) {
+            // Do the optimized split
+            final int runSplitGlyphIndex = GlyphRun.checkpointGetGlyph(splitRun.checkpoints.get(runSplitCheckpointIndex));
+
+            // Create new run and copy the split values into it
+            final GlyphRun<HBFont> newGlyphRun = GlyphRun.obtain(true);
+            // newGlyphRun.x, y -> no need to set, set elsewhere
+            newGlyphRun.line = splitRun.line + 1;
+            newGlyphRun.width = splitRun.width;
+            newGlyphRun.color = splitRun.color;
+            newGlyphRun.font = splitRun.font;
+
+            newGlyphRun.charactersStart = splitIndex;
+            newGlyphRun.charactersEnd = splitRun.charactersEnd;
+            newGlyphRun.charactersLevel = splitRun.charactersLevel;
+            newGlyphRun.characterFlags = splitRun.characterFlags;// NOTE(jp): At the time of writing, this may copy only FLAG_GLYPH_RUN_KERN_TO_LAST_GLYPH
+
+            // optimized (0.1ms)
+            final int glyphCount = splitRun.glyphs.size - runSplitGlyphIndex;
+            System.arraycopy(splitRun.glyphs.items, runSplitGlyphIndex, newGlyphRun.glyphs.ensureCapacity(glyphCount), 0, glyphCount);
+            System.arraycopy(splitRun.glyphX.items, runSplitGlyphIndex, newGlyphRun.glyphX.ensureCapacity(glyphCount), 0, glyphCount);
+            System.arraycopy(splitRun.glyphY.items, runSplitGlyphIndex, newGlyphRun.glyphY.ensureCapacity(glyphCount), 0, glyphCount);
+            newGlyphRun.glyphs.size = glyphCount;
+            newGlyphRun.glyphX.size = glyphCount;
+            newGlyphRun.glyphY.size = glyphCount;
+
+            final int characterCount = splitRun.characterPositions.size - runSplitCharacterIndex;
+            assert characterCount == newGlyphRun.charactersEnd - newGlyphRun.charactersStart;
+            System.arraycopy(splitRun.characterPositions.items, runSplitCharacterIndex, newGlyphRun.characterPositions.ensureCapacity(characterCount), 0, characterCount);
+            newGlyphRun.characterPositions.size = characterCount;
+
+            newGlyphRun.setCheckpointsEnabled(true);
+            final int checkpointCount = splitRun.checkpoints.size - runSplitCheckpointIndex;
+            System.arraycopy(splitRun.checkpoints.items, runSplitCheckpointIndex, newGlyphRun.checkpoints.ensureCapacity(checkpointCount), 0, checkpointCount);
+            newGlyphRun.checkpoints.size = checkpointCount;
+
+            // Adjust new values (shift x coordinate)
+            final float glyphZeroX = splitRun.glyphX.get(runSplitGlyphIndex);
+            newGlyphRun.width -= glyphZeroX;
+            for (int i = 0; i < newGlyphRun.glyphX.size; i++) {
+                newGlyphRun.glyphX.items[i] -= glyphZeroX;
+            }
+
+            final float characterZeroX = splitRun.characterPositions.get(runSplitCharacterIndex);
+            for (int i = 0; i < newGlyphRun.characterPositions.size; i++) {
+                newGlyphRun.characterPositions.items[i] -= characterZeroX;
+            }
+
+            if (runSplitGlyphIndex == 0) {
+                // Shouldn't happen
+                splitRun.width = 0;
+            } else {
+                splitRun.width = splitRun.glyphX.get(runSplitGlyphIndex);
+            }
+
+            // Trim the split values from the original run
+            splitRun.charactersEnd = splitIndex;
+            // NOTE(jp): removeRange does not clear removed items to null, so doing just length manipulation
+            // has the same effect and is faster
+            //splitRun.glyphs.removeRange(runSplitGlyphIndex, splitRun.glyphs.size);
+            splitRun.glyphs.size = runSplitGlyphIndex;
+            splitRun.glyphX.size = runSplitGlyphIndex;
+            splitRun.glyphY.size = runSplitGlyphIndex;
+            splitRun.characterPositions.size = runSplitCharacterIndex;
+            splitRun.checkpoints.size = runSplitCheckpointIndex;
+
+            // Add the run to layout
+            final int insertIndex = runIndex + 1;
+            runs.insert(insertIndex, newGlyphRun);
+            return insertIndex;
+        } else {
+            // Do the O(n^2) split
+            // (the checkpoint check above probably hit a ligature or something, this shouldn't happen often)
+            runs.removeIndex(runIndex);
+
+            startX = splitRun.x;
+            int insertIndex = runIndex;
+            insertIndex += addRunsFor(chars, charsLength, splitRun.charactersStart, splitIndex, splitRun.charactersLevel,
+                    splitRun.font, splitRun.color, splitRun.line, insertIndex, (splitRun.characterFlags & FLAG_GLYPH_RUN_IS_PARAGRAPH_START) != 0, true);
+
+            startX = 0f;// Not really needed as it is reordered later, but cleaner
+            addRunsFor(chars, charsLength, splitIndex, splitRun.charactersEnd, splitRun.charactersLevel,
+                    splitRun.font, splitRun.color, splitRun.line + 1, // To prevent kerning with previous run
+                    insertIndex, true, (splitRun.characterFlags & FLAG_GLYPH_RUN_IS_PARAGRAPH_END) != 0);
+
+            GlyphRun.<HBFont>pool().free(splitRun);
+            return insertIndex;
+        }
+    }
+
+    /** Returns character index of line-break point at which the characters should fold to next line.
+     * Character at index and following characters may be {@link #COLLAPSIBLE_SPACE}, in which case the linebreak should
+     * be at the first character which is not that character.
+     * @param hitIndex which should already be at the next line
+     * @return index in [lineStart, lineEnd) range */
+    private int findWrapPointFor(LayoutText<HBFont> text, final int lineStart, final int lineEnd, final int hitIndex) {
+        assert hitIndex >= lineStart && hitIndex < lineEnd;
+
+        if (hitIndex <= lineStart + 1) {
+            // We have to wrap at at least one character, at all times, so no reason to search further
+            return lineStart + 1;
+        }
+
+        final char[] chars = text.text();
+        final Locale locale = text.getLocale();
+        if (locale == null) {
+            int i = hitIndex;
+            if (!Character.isWhitespace(chars[i])) {
+                // Shift left, one after the nearest whitespace
+                while (i > lineStart && !Character.isWhitespace(chars[i - 1])) {
+                    i--;
+                }
+            } // else: Don't do anything, we can break here
+
+            if (i <= lineStart) {
+                // There is no whitespace to hang on, fallback to by-char mode
+                i = hitIndex;
+            }
+            return i;
+        } else {
+            // Use break iterator
+            BreakIterator lineBreakIterator = getLineBreakIterator(text, lineStart, lineEnd, locale);
+
+            if (lineBreakIterator.isBoundary(hitIndex)) {
+                // It is already perfect.
+                return hitIndex;
+            }
+            // Can we use hitIndex anyway because of collapsing?
+            collapseToNextBreak:
+            {
+                final int following = lineBreakIterator.following(hitIndex);
+                if (following == BreakIterator.DONE) {
+                    break collapseToNextBreak;
+                }
+                for (int i = hitIndex; i < following; i++) {
+                    if (chars[i] != COLLAPSIBLE_SPACE) {
+                        break collapseToNextBreak;
+                    }
+                }
+                return hitIndex;
+            }
+
+            final int preceding = lineBreakIterator.preceding(hitIndex);
+            if (preceding == BreakIterator.DONE || preceding <= lineStart) {
+                // Fall back to char mode
+                return hitIndex;
+            }
+
+            return preceding;
+        }
     }
 
     @Override
@@ -372,42 +648,41 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
             return;
         }
 
-        int textRunGroupStart = 0;
-        boolean paragraphStart = true;
-        doForTextRuns:
-        do {
-            final TextRun<HBFont> firstTextRun = textRuns.items[textRunGroupStart];
-            final int textRunGroupEnd;
+        final char[] chars = text.text();
+        final int charsLength = text.length();
 
-            final int flags = firstTextRun.flags;
+        boolean paragraphStart = true;
+        forTextRuns:
+        for (int textRunIndex = 0; textRunIndex < textRuns.size; textRunIndex++) {
+            final boolean lastTextRun = textRunIndex + 1 == textRuns.size;
+            final TextRun<HBFont> textRun = textRuns.items[textRunIndex];
+
+            final int flags = textRun.flags;
             boolean linebreak = (flags & TextRun.FLAG_LINE_BREAK) != 0;
 
             if (linebreak) {
-                addLinebreakRunFor(firstTextRun, line);
+                addLinebreakRunFor(textRun, line);
                 paragraphStart = true;
-                textRunGroupEnd = textRunGroupStart + 1;
-            } else if ((firstTextRun.flags & TextRun.FLAG_TAB_STOP) != 0) {
-                addTabStopRunFor(text, firstTextRun, line);
-                textRunGroupEnd = textRunGroupStart + 1;
+            } else if ((textRun.flags & TextRun.FLAG_TAB_STOP) != 0) {
+                addTabStopRunFor(text, textRun, line);
             } else {
-                textRunGroupEnd = findRunGroupEnd(textRuns, textRunGroupStart);
-                addRunsForTextRuns(text, textRuns, textRunGroupStart, textRunGroupEnd, line,
+                addRunsFor(chars, charsLength, textRun.start, textRun.end,
+                        textRun.level, textRun.font, textRun.color,
+                        line, runs.size,
                         paragraphStart,
-                        textRunGroupEnd >= textRuns.size || (textRuns.get(textRunGroupEnd - 1).flags & TextRun.FLAG_LINE_BREAK) != 0
-                        );
+                        lastTextRun || (textRuns.items[textRunIndex + 1].flags & TextRun.FLAG_LINE_BREAK) != 0);
                 paragraphStart = false;
             }
-            final boolean lastTextRun = textRunGroupEnd >= textRuns.size;
 
             // Wrapping
-            /*wrapping:
+            wrapping:
             while (startX >= availableWidth) {
                 assert lineLaidRuns < runs.size;
 
                 if (line + 1 >= maxLines) {
                     // Wrapping this is unnecessary, as it will be ellipsized later.
                     clampLines = true;
-                    break doForTextRuns;
+                    break forTextRuns;
                 }
 
                 // Find character index from which to wrap
@@ -445,7 +720,7 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
 
                 // Find where actual split happens and split it there
                 final int splitRunIndex = runIndexWithCharIndex(lineLaidRuns, realWrapIndex);
-                int firstRunOnWrappedLineIndex = splitRunForWrap(chars, splitRunIndex, realWrapIndex);
+                int firstRunOnWrappedLineIndex = splitRunForWrap(chars, charsLength, splitRunIndex, realWrapIndex);
 
                 final boolean wrappedBecauseOfCollapsedText = firstRunOnWrappedLineIndex == runs.size;
                 // When collapsed spaces end with a newline, it won't be moved to a next line,
@@ -510,7 +785,8 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
                     while (true) {
                         // Set positions of glyphs (space glyphs, presumably, from back to front)
                         for (int i = collapseRun.glyphs.size-1; i > 0; i--) {
-                            final float glyphXAdvance = ((Glyph) collapseRun.glyphs.items[i]).xAdvance;
+                            // NOTE(jp): should technically be x advance, not width, but we don't have any info on that
+                            final float glyphXAdvance = collapseRun.glyphs.items[i].width;
                             final float originalX = collapseRun.glyphX.items[i];
                             if (originalX + glyphXAdvance <= collapseToPos) {
                                 // Glyphs that were not collapsed start here
@@ -569,15 +845,13 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
                 // Line wrapping is done. Since this is a while-loop, it may run multiple times, because the wrapped
                 // runs may still be too long to fit. This can degrade to "slow" O(n^2) when the font/text is extremely
                 // ligature heavy, see splitRunForWrap. Though this shouldn't happen often.
-                // (as of writing this, it should never happen, as BitmapFont does not generate any ligatures,
-                // but maybe in the future)
-            }*/
+            }
 
             if (lastTextRun || linebreak) {
                 // Line probably has to be completed, unless it has been completed before by wrapping algo
 
                 if (lineLaidRuns < runs.size) {
-                    completeLine(text, lineLaidRuns, runs.size, firstTextRun.font);
+                    completeLine(text, lineLaidRuns, runs.size, textRun.font);
                     lineLaidRuns = runs.size;
                     line++;
                 }
@@ -600,7 +874,7 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
 
                 if (lastTextRun && linebreak) {
                     // Last line ends with \n, there should be additional new line with the height of current font
-                    addLineHeight(firstTextRun.font.lineHeight);
+                    addLineHeight(textRun.font.lineHeight);
 
                     // This definitely leads on to the non-first line. Check if it still fits height requirements.
                     if (getHeight() > availableHeight) {
@@ -609,9 +883,7 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
                     }
                 }
             }
-
-            textRunGroupStart = textRunGroupEnd;
-        } while (textRunGroupStart < textRuns.size);
+        }// end for text runs
 
         // All relevant text runs were added, ensure that we fit with number of lines/height
         if (clampLines) {
@@ -689,9 +961,8 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
         final float ellipsisWidth;
         if (!ellipsis.isEmpty()) {
             final float startXBeforeEllipsis = startX;
-            // TODO(jp): Implement
-            /*addEllipsisRunFor(ellipsis, (byte) (text.isLeftToRight() ? 0 : 1),
-                    text.getInitialFont(), text.getInitialColor(), lastAllowedLine, ellipsisStart);*/
+            addEllipsisRunFor(ellipsis, (byte) (text.isLeftToRight() ? 0 : 1),
+                    text.getInitialFont(), text.getInitialColor(), lastAllowedLine, ellipsisStart);
             ellipsisWidth = startX - startXBeforeEllipsis;
         } else {
             ellipsisWidth = 0f;
@@ -699,8 +970,6 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
 
         // Trim previous runs, so that ellipsis fits on the line width-wise
         if (startX > availableWidth) {
-            final char[] chars = text.text();
-
             // We need to trim
             int trimmedIndex = ellipsisStart - 1;
             GlyphRun<HBFont> trimmedRun;
@@ -719,7 +988,6 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
                 }
                 // This run does not need to be removed, but we need to trim it
                 startX = trimmedRun.x;
-                /* TODO Implement
                 final boolean trimmedRunLtr = trimmedRun.isLtr();
                 int charactersEnd = charEndIndexForTargetRunWidth(trimmedRun, availableWidth - ellipsisWidth - trimmedRun.x);
                 runs.removeIndex(trimmedIndex);
@@ -729,10 +997,9 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
                     break;
                 } else {
                     // Run can be re-added, with less characters
-                    ellipsisStart += addRunsFor(chars, trimmedRun.charactersStart, charactersEnd, trimmedRun.charactersLevel,
-                            trimmedRun.font, trimmedRun.color, trimmedRun.line, trimmedIndex);
+                    ellipsisStart += addRunsFor(text.text(), text.length(), trimmedRun.charactersStart, charactersEnd, trimmedRun.charactersLevel,
+                            trimmedRun.font, trimmedRun.color, trimmedRun.line, trimmedIndex, (trimmedRun.characterFlags & FLAG_GLYPH_RUN_IS_PARAGRAPH_START) != 0, true);
                 }
-                */
                 GlyphRun.<HBFont>pool().free(trimmedRun);
             }
 
@@ -747,5 +1014,4 @@ public class HBGlyphLayout extends GlyphLayout<HBFont> {
         // Re-complete the line
         completeLine(text, lineLaidRuns, runs.size, text.getInitialFont());
     }
-
 }

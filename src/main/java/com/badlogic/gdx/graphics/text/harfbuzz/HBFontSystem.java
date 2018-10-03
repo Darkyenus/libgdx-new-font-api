@@ -66,29 +66,15 @@ public class HBFontSystem implements FontSystem<HBGlyphLayout>, Disposable {
             }
 
             final FreeType.Face face = freeTypeLibrary.newMemoryFace(buffer, 0);
-            final int pixelSize = Math.round(size * pixelsPerPoint);
-            if (isFaceScalable(face)) {
-                face.setPixelSizes(0, pixelSize);
-            } else {
-                // TODO(jp): Implement matching of the closes available size.
-                // FreeType seems to do this only for perfect matches,
-                // but we should do it with a best effort basis.
-                face.setPixelSizes(0, pixelSize);
-            }
 
             if (parameters == null) {
                 parameters = new FontParameters();
             }
 
-            return new HBFont(freeTypeLibrary, face, pixelsPerPoint, parameters);// TODO(jp): Probably not all three size metrics are needed
+            return new HBFont(freeTypeLibrary, face, size, pixelsPerPoint, parameters);// TODO(jp): Probably not all three size metrics are needed
         } catch (Exception e) {
             throw new GdxRuntimeException("Failed to load "+fontFile, e);
         }
-    }
-
-    private static boolean isFaceScalable(FreeType.Face face) {
-        final int faceFlags = face.getFaceFlags();
-        return (faceFlags & FreeType.FT_FACE_FLAG_SCALABLE) != 0;
     }
 
     @Override

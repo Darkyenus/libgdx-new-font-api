@@ -1,13 +1,25 @@
 package com.badlogic.gdx.graphics.text;
 
+import com.badlogic.gdx.graphics.text.util.CharArrayIterator;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.*;
 
+import java.text.BreakIterator;
 import java.util.Arrays;
+import java.util.Locale;
 
 /** Class responsible for laying out the glyphs constructed from fonts of this font system.
  * Also stores the laid out glyphs. */
 public abstract class GlyphLayout<F extends Font<F>> {
+
+    /** When line that needs to be wrapped ends with this character (normal space),
+     * arbitrary amount of these characters that overflow will be "collapsed", i.e. all positioned at the same
+     * rightmost available position on the line.
+     * It is expected that the character is not visible, so this does not look strange.
+     * There is a "special case": when the collapsed characters end with a newline, the newline is still considered
+     * a part of the original wrapped line with collapsed characters, not as a solo newline on a line.
+     * This is what regular text editors do (at least on Mac), even when invisible characters (such as space) are shown. */
+    protected static final char COLLAPSIBLE_SPACE = ' ';
 
     /** Runs of the layout. Ordered by lines and then by X coordinate (not by char positions).
      * Some runs may not contain any glyphs and serve just to specify which (non-rendered) glyphs are on which line. */
@@ -628,5 +640,26 @@ public abstract class GlyphLayout<F extends Font<F>> {
             levelItems[i] = runs[runsStart + i].charactersLevel;
         }
         return levelItems;
+    }
+
+    private static ObjectMap<Locale, BreakIterator> getLineBreakIterator_lineBreakIteratorCache;
+    private static CharArrayIterator getLineBreakIterator_charIteratorCache;
+
+    protected static <F extends Font<F>> BreakIterator getLineBreakIterator(LayoutText<F> text, int start, int end, Locale locale) {
+        ObjectMap<Locale, BreakIterator> brItMap = GlyphLayout.getLineBreakIterator_lineBreakIteratorCache;
+        CharArrayIterator charIterator = getLineBreakIterator_charIteratorCache;
+        if (brItMap == null) {
+            brItMap = getLineBreakIterator_lineBreakIteratorCache = new ObjectMap<>();
+            charIterator = getLineBreakIterator_charIteratorCache = new CharArrayIterator();
+        }
+        charIterator.reset(text.text(), start, end);
+
+        BreakIterator breakIterator = brItMap.get(locale);
+        if (breakIterator == null) {
+            breakIterator = BreakIterator.getLineInstance(locale);
+            brItMap.put(locale, breakIterator);
+        }
+        breakIterator.setText(charIterator);
+        return breakIterator;
     }
 }

@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.ImagePacker;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeType;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeExtra;
 import com.badlogic.gdx.graphics.text.Font;
 import com.badlogic.gdx.graphics.text.Glyph;
 import com.badlogic.gdx.graphics.text.GlyphLayout;
@@ -48,7 +49,7 @@ public class HBFont implements Font<HBFont> {
     /** The x-advance of the space character. Used for all unknown whitespace characters or tab advance. */
     public float spaceXAdvance;
 
-    protected HBFont(FreeType.Library library, FreeType.Face face, float pixelsPerPoint, FontParameters parameters) {
+    protected HBFont(FreeType.Library library, FreeType.Face face, float size, float pixelsPerPoint, FontParameters parameters) {
         this.face = face;
         this.hbFont = HarfBuzz.Font.createReferenced(face);
         this.glyphs = new HBGlyph[face.getNumGlyphs()];
@@ -72,7 +73,17 @@ public class HBFont implements Font<HBFont> {
             }
         };
 
-        // TODO(jp): Following is probably wrong because of wrong units
+        final int pixelSize = Math.round(size * pixelsPerPoint);
+        if (isFaceScalable(face)) {
+            FreeTypeExtra.FT_Request_Size(face,
+                    FreeTypeExtra.FT_Size_Request_Type_FT_SIZE_REQUEST_TYPE_REAL_DIM,
+                    HarfBuzz.to26p6FromInt(pixelSize), HarfBuzz.to26p6FromInt(pixelSize), 0, 0);
+        } else {
+            // TODO(jp): Implement matching of the closest available size.
+            // FreeType seems to do this only for perfect matches,
+            // but we should do it with a best effort basis.
+            face.setPixelSizes(0, pixelSize);
+        }
 
         if (face.loadChar(' ', FreeType.FT_LOAD_DEFAULT)) {
             spaceXAdvance = FreeType.toInt(face.getGlyph().getAdvanceX()) * densityScale;
@@ -83,6 +94,11 @@ public class HBFont implements Font<HBFont> {
         final FreeType.SizeMetrics metrics = face.getSize().getMetrics();
         lineHeight = FreeType.toInt(metrics.getHeight()) * densityScale;
         base = FreeType.toInt(metrics.getAscender()) * densityScale;
+    }
+
+    private static boolean isFaceScalable(FreeType.Face face) {
+        final int faceFlags = face.getFaceFlags();
+        return (faceFlags & FreeType.FT_FACE_FLAG_SCALABLE) != 0;
     }
 
     @Override

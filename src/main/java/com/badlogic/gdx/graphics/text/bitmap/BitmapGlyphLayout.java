@@ -2,10 +2,8 @@ package com.badlogic.gdx.graphics.text.bitmap;
 
 import com.badlogic.gdx.graphics.text.*;
 import com.badlogic.gdx.graphics.text.LayoutTextRunArray.TextRun;
-import com.badlogic.gdx.graphics.text.util.CharArrayIterator;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.FloatArray;
-import com.badlogic.gdx.utils.ObjectMap;
 
 import java.text.Bidi;
 import java.text.BreakIterator;
@@ -19,15 +17,6 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
 
     private static final byte FLAG_GLYPH_RUN_KERN_TO_LAST_GLYPH = (byte) (1 << 7);
     private static final byte FLAG_GLYPH_RUN_HAS_COLLAPSED_SPACES = (byte) (1 << 6);
-
-    /** When line that needs to be wrapped ends with this character (normal space),
-     * arbitrary amount of these characters that overflow will be "collapsed", i.e. all positioned at the same
-     * rightmost available position on the line.
-     * It is expected that the character is not visible, so this does not look strange.
-     * There is a "special case": when the collapsed characters end with a newline, the newline is still considered
-     * a part of the original wrapped line with collapsed characters, not as a solo newline on a line.
-     * This is what regular text editors do (at least on Mac), even when invisible characters (such as space) are shown. */
-    private static final char COLLAPSIBLE_SPACE = ' ';
 
     /** Borrowed by BitmapGlyphLayout instances when they are doing glyph layout, to store all fonts in the layout. */
     private static final Array<BitmapFont> usedFonts = new Array<>(true, 10, BitmapFont.class);
@@ -1059,26 +1048,5 @@ public class BitmapGlyphLayout extends GlyphLayout<BitmapFont> {
     public void clear() {
         super.clear();
         startX = 0f;
-    }
-
-    private static ObjectMap<Locale, BreakIterator> getLineBreakIterator_lineBreakIteratorCache;
-    private static CharArrayIterator getLineBreakIterator_charIteratorCache;
-
-    private static <F extends Font<F>> BreakIterator getLineBreakIterator(LayoutText<F> text, int start, int end, Locale locale) {
-        ObjectMap<Locale, BreakIterator> brItMap = BitmapGlyphLayout.getLineBreakIterator_lineBreakIteratorCache;
-        CharArrayIterator charIterator = getLineBreakIterator_charIteratorCache;
-        if (brItMap == null) {
-            brItMap = getLineBreakIterator_lineBreakIteratorCache = new ObjectMap<>();
-            charIterator = getLineBreakIterator_charIteratorCache = new CharArrayIterator();
-        }
-        charIterator.reset(text.text(), start, end);
-
-        BreakIterator breakIterator = brItMap.get(locale);
-        if (breakIterator == null) {
-            breakIterator = BreakIterator.getLineInstance(locale);
-            brItMap.put(locale, breakIterator);
-        }
-        breakIterator.setText(charIterator);
-        return breakIterator;
     }
 }

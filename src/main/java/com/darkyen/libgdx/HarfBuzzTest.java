@@ -10,9 +10,11 @@ import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFontCache;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeType;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.text.FontRenderCache;
 import com.badlogic.gdx.graphics.text.bitmap.BitmapFont;
 import com.badlogic.gdx.graphics.text.bitmap.BitmapFontSystem;
@@ -172,6 +174,7 @@ public class HarfBuzzTest {
 
     public static void applicationBitmapTest() {
         final Lwjgl3ApplicationConfiguration conf = new Lwjgl3ApplicationConfiguration();
+        conf.setTitle("Bitmap");
         new Lwjgl3Application(new ApplicationAdapter(){
 
             /*
@@ -385,6 +388,7 @@ public class HarfBuzzTest {
 
     public static void applicationHarfbuzzTest() {
         final Lwjgl3ApplicationConfiguration conf = new Lwjgl3ApplicationConfiguration();
+        conf.setTitle("Harfbuzz");
         new Lwjgl3Application(new ApplicationAdapter(){
 
             /*
@@ -395,6 +399,7 @@ public class HarfBuzzTest {
             F3 = cycle horizontal align
             F4 = delete all text
             F5 = view as markup
+            F6 = render legacy
              */
 
             ScreenViewport viewport = new ScreenViewport();
@@ -411,6 +416,7 @@ public class HarfBuzzTest {
 
             com.badlogic.gdx.graphics.g2d.BitmapFont legacyBitmapFont;
             GlyphLayout legacyGlyphLayout;
+            BitmapFontCache legacyCache;
 
 
             final Vector2 mouse = new Vector2();
@@ -428,17 +434,23 @@ public class HarfBuzzTest {
 
                 fontSystem = new HBFontSystem();
 
+                final FileHandle someTimeLaterFontFile = Gdx.files.local("test-fonts/some-time-later/Some Time Later.otf");
+
                 HBFontSystem.FontParameters parameters = new HBFontSystem.FontParameters();
                 font = fontSystem.createIncrementalFont(
-                        Gdx.files.local("test-fonts/some-time-later/Some Time Later.otf"), 32f, 2f, parameters);
+                        someTimeLaterFontFile, 32f, 2f, parameters);
                 fontBold = fontSystem.createIncrementalFont(
-                        Gdx.files.local("test-fonts/some-time-later/Some Time Later.otf"),  32f, 2f, parameters);
+                        someTimeLaterFontFile,  32f, 2f, parameters);
                 fontItalic = fontSystem.createIncrementalFont(
-                        Gdx.files.local("test-fonts/some-time-later/Some Time Later.otf"), 32f, 2f, parameters);
+                        someTimeLaterFontFile, 32f, 2f, parameters);
 
-                legacyBitmapFont = new com.badlogic.gdx.graphics.g2d.BitmapFont(Gdx.files.local("test-fonts/some-time-later/some-time-later-regular64.fnt"));
-                legacyBitmapFont.getData().scale(0.5f);
+                final FreeTypeFontGenerator.FreeTypeFontParameter legacyParameter = new FreeTypeFontGenerator.FreeTypeFontParameter();
+                legacyParameter.size = 32;
+                legacyParameter.incremental = true;
+                legacyBitmapFont = new FreeTypeFontGenerator(someTimeLaterFontFile).generateFont(legacyParameter);
+                //legacyBitmapFont.getData().scale(0.5f);
                 legacyGlyphLayout = new GlyphLayout();
+                legacyCache = new BitmapFontCache(legacyBitmapFont, false);
 
                 layout = fontSystem.createGlyphLayout();
 
@@ -456,10 +468,10 @@ public class HarfBuzzTest {
                 white = new Texture(pixmap);
 
 
-                //sb.append("Hello world, WHY,\nVAVAW % Ø");
+                sb.append("Hello world, WHY,\nVAVAW % Ø");
                 //sb.append(LOREM_IPSUM);
                 //sb.append(HEBREW_WIKI);
-                sb.append(ENGLISH_WIKI);
+                //sb.append(ENGLISH_WIKI);
                 //sb.append(SIMPLE_TEXT);
                 //sb.append(ZALGO);
                 caretIndex = sb.length;
@@ -559,30 +571,45 @@ public class HarfBuzzTest {
                     }
                     final double legacyLayoutDuration = (System.nanoTime() - legacyLayoutStart) / (1_000_000.0 * benchmarkLoopCount);
                     System.out.printf("%.3f ms (legacy: %.3f ms)\n", duration, legacyLayoutDuration);
+                }
+
+                if (Gdx.input.isKeyPressed(Input.Keys.F6)) {
+                    // Legacy render
+                    legacyGlyphLayout.setText(legacyBitmapFont, text, Color.BLUE, targetWidth, align, true);
+                    final float textX = Gdx.graphics.getWidth()/2f - legacyGlyphLayout.width/2f;
+                    final float textY = Gdx.graphics.getHeight()/2f + legacyGlyphLayout.height/2f;
+                    legacyCache.addText(legacyGlyphLayout, textX , textY);
+
+                    batch.setProjectionMatrix(viewport.getCamera().combined);
+                    batch.begin();
+                    batch.enableBlending();
+                    batch.setColor(1f, 1f, 1f, 1f);
+                    batch.draw(white, textX, textY, layout.getWidth(), -layout.getHeight());
+                    legacyCache.draw(batch);
                 } else {
+                    // HarfBuzz render
                     layout.layoutText(text, targetWidth, /*300f*/-4f, align, "...");
-                }
+                    final float textX = Gdx.graphics.getWidth()/2f - layout.getAlignWidth()/2f;
+                    final float textY = Gdx.graphics.getHeight()/2f + layout.getHeight()/2f;
+                    cache.addGlyphs(layout, textX, textY);
 
-                final float textX = Gdx.graphics.getWidth()/2f - layout.getAlignWidth()/2f;
-                final float textY = Gdx.graphics.getHeight()/2f + layout.getHeight()/2f;
-                cache.addGlyphs(layout, textX, textY);
+                    batch.setProjectionMatrix(viewport.getCamera().combined);
+                    batch.begin();
+                    batch.enableBlending();
+                    batch.setColor(1f, 1f, 1f, 1f);
+                    batch.draw(white, textX, textY, layout.getWidth(), -layout.getHeight());
+                    cache.draw(batch);
 
-                batch.setProjectionMatrix(viewport.getCamera().combined);
-                batch.begin();
-                batch.enableBlending();
-                batch.setColor(1f, 1f, 1f, 1f);
-                batch.draw(white, textX, textY, layout.getWidth(), -layout.getHeight());
-                cache.draw(batch);
-
-                //Caret
-                if (Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
-                    caretIndex = layout.getIndexAt(mouse.x - textX, mouse.y  - textY, true);
-                }
-                final Rectangle caretRect = layout.getCaretPosition(caretIndex);
-                if (caretRect != null) {
-                    caretRect.width = 1f;
-                    batch.setColor(0f, 0f, 0f, 1f);
-                    batch.draw(white, textX + caretRect.x, textY + caretRect.y, caretRect.width, caretRect.height);
+                    //Caret
+                    if (Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
+                        caretIndex = layout.getIndexAt(mouse.x - textX, mouse.y  - textY, true);
+                    }
+                    final Rectangle caretRect = layout.getCaretPosition(caretIndex);
+                    if (caretRect != null) {
+                        caretRect.width = 1f;
+                        batch.setColor(0f, 0f, 0f, 1f);
+                        batch.draw(white, textX + caretRect.x, textY + caretRect.y, caretRect.width, caretRect.height);
+                    }
                 }
 
                 batch.end();

@@ -1682,7 +1682,15 @@ public final class HarfBuzz {
 		}
 	}
 
-	public static float toFloat26_6(int fixedPoint26_6) {
-		return fixedPoint26_6 / 64f;
+	public static float toFloatFrom26p6(int fixedPoint26p6) {
+		return fixedPoint26p6 / 64f;
+	}
+
+	public static long to26p6FromInt(int number) {
+		return number * 64;
+	}
+
+	public static long to26p6FromFloat(float number) {
+		return Math.round(number * 64.0);
 	}
 }
